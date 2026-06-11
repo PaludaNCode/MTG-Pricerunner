@@ -20,11 +20,16 @@ node cloud/verify-mobile.js
 # Build cloud data locally (needs the CardTrader API token in env)
 CARDTRADER_TOKEN=... node cloud/fetch-cardtrader.js
 
+# Unit tests (node:test, zero deps) — config normalization + Cardmarket HTML parser
+npm test
+# Single test file
+node --test test/cards.test.js
+
 # Syntax-check everything (same as CI)
 for f in $(git ls-files '*.js'); do node --check "$f"; done
 ```
 
-There is no build step and no unit test suite — CI (`.github/workflows/ci.yml`, job `checks`) runs the syntax check + the smoke test above.
+No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + unit tests + the smoke test above.
 
 ## Workflow rules (non-negotiable)
 
