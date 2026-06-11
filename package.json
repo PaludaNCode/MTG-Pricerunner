@@ -2,7 +2,7 @@
   "name": "pricerunner",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "local/server.js",
   "scripts": {
     "test": "node --test",
     "start": "node local/server.js"
@@ -12,8 +12,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "playwright": "^1.60.0",
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "playwright": "^1.60.0"
   }
 }
