@@ -36,6 +36,7 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 - **Never push to `main` directly.** Branch (`feat/...` / `fix/...`) → PR → wait for the `checks` job → merge. Merging to `main` *is* the release: the deploy workflow publishes to Pages on push. Admin rights bypass the protection — don't use that.
 - **Never run `local/stop-watcher.cmd` from a session** — it force-kills *every* `node.exe` on the machine (including Claude Code's own tooling). To restart the watcher, kill only the PID listening on port 8787, then `Start-Process node -ArgumentList 'server.js' -WorkingDirectory local -WindowStyle Hidden`.
 - After changing `local/server.js`, the running watcher must be restarted the same way to pick it up.
+- Dependabot opens weekly grouped PRs (actions + npm). They follow the normal PR flow: merge when `checks` is green.
 
 ## Architecture
 

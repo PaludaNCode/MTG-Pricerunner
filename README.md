@@ -42,6 +42,13 @@ Trunk-based, short-lived branches:
 `main` is protected: PRs need the `checks` job green before merge; force-pushes and
 deletion are blocked. Repo admins can push directly in a pinch (escape hatch — prefer PRs).
 
+## Maintenance
+
+Dependabot (`.github/dependabot.yml`) opens a weekly grouped PR per ecosystem when
+updates exist: one for GitHub Actions versions, one for npm. Treat them like any PR —
+CI must be green, then merge. If the repo sees no commits for 60 days GitHub pauses
+the cron schedule and emails the owner; re-enable under the Actions tab.
+
 ## UI rules
 
 Desktop layout is the reference design — don't touch the base CSS look.

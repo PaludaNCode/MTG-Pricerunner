@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Keep workflow actions current (e.g. actions/checkout@vN) — stale pins are
+  # what caused the Node 20 deprecation warnings on every deploy run.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
