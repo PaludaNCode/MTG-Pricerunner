@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JP Card Watcher</title>
+<link rel="stylesheet" href="ui.css" />
+</head>
+<body>
+<header>
+  <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Japanese</span></h1>
+  <span class="live"><span class="dot"></span>live</span>
+  <span id="fetching" class="meta"></span>
+  <span class="spacer"></span>
+  <button id="enableNotif">🔔 Notifications</button>
+  <span id="updated" class="meta">loading…</span>
+</header>
+<div id="grid"></div>
+<div id="watching" class="watching"></div>
+
+<script>window.DASH = { url: "data.json", intervalMs: 60000 };</script>
+<script src="render.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
