@@ -34,6 +34,8 @@ jobs:
           node-version: "24"
       - name: Fetch CardTrader data -> cloud/web/data.json
         run: node cloud/fetch-cardtrader.js
+        env:
+          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
       - name: Copy shared UI into the site
         run: cp shared/ui.css shared/render.js shared/app.js cloud/web/
       - uses: actions/configure-pages@v5
