@@ -1,0 +1,44 @@
+{
+  "updatedAt": "2026-01-01T12:00:00.000Z",
+  "results": [
+    {
+      "site": "cardtrader",
+      "group": "Fixture Card",
+      "variant": "Extended Art",
+      "name": "Fixture Card — Extended Art",
+      "productUrl": "https://example.com/1",
+      "offers": [
+        { "price": 4.11, "priceStr": "4.11 €", "foil": false, "condition": "Near Mint", "qty": 7, "seller": "ShortName", "shipsToMe": true },
+        { "price": 28.4, "priceStr": "28.40 €", "foil": true, "condition": "Excellent", "qty": 1, "seller": "AVeryLongSellerName123", "shipsToMe": false },
+        { "price": 10046.64, "priceStr": "10046.64 €", "foil": true, "condition": "Mint", "qty": 2, "seller": "Zio_Peppino", "shipsToMe": null }
+      ]
+    },
+    {
+      "site": "cardmarket",
+      "group": "Fixture Card",
+      "variant": "Prerelease",
+      "name": "Fixture Card — Prerelease",
+      "productUrl": "https://example.com/2",
+      "offers": [
+        { "price": 18.05, "priceStr": "18.05 €", "foil": false, "condition": "Light Played", "qty": 1, "seller": "Dualgames", "shipsToMe": true }
+      ]
+    },
+    {
+      "site": "cardtrader",
+      "group": "Empty Watch",
+      "variant": "Promos",
+      "name": "Empty Watch — Promos",
+      "productUrl": "https://example.com/3",
+      "offers": []
+    },
+    {
+      "site": "cardmarket",
+      "group": "Broken Watch",
+      "variant": "Zendikar Rising",
+      "name": "Broken Watch — Zendikar Rising",
+      "productUrl": "https://example.com/4",
+      "offers": [],
+      "error": "HTTP 429"
+    }
+  ]
+}

@@ -1,11 +1,23 @@
-// Temp verification: serve cloud/web, screenshot mobile + desktop viewports.
+// UI smoke test: serve cloud/web, render the dashboard at three viewports,
+// screenshot, and FAIL (exit 1) on horizontal overflow or zero rendered cards.
+// Self-contained: copies the shared UI into web/ and falls back to the committed
+// fixture when no live data.json exists (CI never hits the real APIs).
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 
 const WEB = path.join(__dirname, "web");
+const SHARED = path.join(__dirname, "..", "shared");
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
+
+for (const f of ["ui.css", "render.js", "app.js"]) {
+  fs.copyFileSync(path.join(SHARED, f), path.join(WEB, f));
+}
+if (!fs.existsSync(path.join(WEB, "data.json"))) {
+  fs.copyFileSync(path.join(__dirname, "fixture-data.json"), path.join(WEB, "data.json"));
+  console.log("no live data.json — using fixture-data.json");
+}
 
 const server = http.createServer((req, res) => {
   const file = path.join(WEB, req.url.split("?")[0] === "/" ? "index.html" : req.url.split("?")[0]);
@@ -21,15 +33,20 @@ const server = http.createServer((req, res) => {
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
   const browser = await chromium.launch();
+  let failed = false;
   for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["narrow", { width: 320, height: 700 }], ["desktop", { width: 1440, height: 900 }]]) {
     const page = await browser.newPage({ viewport: vp });
     await page.goto(`http://localhost:${port}/`);
-    await page.waitForSelector("#grid .card");
+    await page.waitForSelector("#grid .card", { timeout: 10000 }).catch(() => {});
+    const cards = await page.locator("#grid .card").count();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    console.log(`${name}: horizontal overflow = ${overflow}px`);
+    const ok = cards > 0 && overflow <= 0;
+    if (!ok) failed = true;
+    console.log(`${name}: ${cards} cards, horizontal overflow = ${overflow}px ${ok ? "OK" : "FAIL"}`);
     await page.screenshot({ path: path.join(__dirname, `shot-${name}.png`), fullPage: false });
     await page.close();
   }
   await browser.close();
   server.close();
+  process.exitCode = failed ? 1 : 0;
 })();
