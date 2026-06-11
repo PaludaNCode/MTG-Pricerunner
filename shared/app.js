@@ -1,7 +1,8 @@
 // Shared page bootstrap for the local watcher and the cloud static site.
-// The page sets window.DASH = { url, intervalMs } before including this script.
+// The page sets window.DASH = { url, intervalMs, showSrc? } before including this script.
 // Both dashboards render identically; only the data source behind `url` differs
 // (local: rolling scraper at /state, cloud: prebuilt data.json from GitHub Actions).
+// showSrc: false hides the Src column — useful when a page has a single source.
 (function () {
   const cfg = window.DASH || {};
   let firstRun = true;
@@ -16,7 +17,7 @@
     try {
       const sep = cfg.url.includes("?") ? "&" : "?";
       const data = await (await fetch(cfg.url + sep + "t=" + Date.now())).json();
-      const { totalOffers, newAlerts } = CardUI.renderGrid(data, { showShips: true, showSrc: true, seen, firstRun });
+      const { totalOffers, newAlerts } = CardUI.renderGrid(data, { showShips: true, showSrc: cfg.showSrc !== false, seen, firstRun });
       if (newAlerts.length) notify("New JP listing!", newAlerts.join("\n"));
       $("fetching").textContent = data.current ? "⏳ " + data.current : "";
       $("updated").textContent =
