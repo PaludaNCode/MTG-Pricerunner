@@ -1,12 +1,13 @@
-name: Update card data & deploy
+name: Deploy site
 
+# Deploys only when the UI/source actually changes. Data freshness is handled
+# by update-data.yml, which publishes data.json to the `data` branch — the
+# cloud page fetches it from raw.githubusercontent.com, no deploy needed.
 on:
-  schedule:
-    - cron: "*/5 * * * *" # every 5 min (GitHub best-effort; often delayed)
   workflow_dispatch: {} # manual run button
   push:
     branches: [main]
-    paths: ["cloud/**", "shared/**", "config.json", ".github/workflows/update.yml"]
+    paths: ["cloud/web/**", "shared/**", ".github/workflows/update.yml"]
 
 permissions:
   contents: read
@@ -16,7 +17,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-# don't let overlapping scheduled runs stack up
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -29,13 +29,6 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-      - name: Fetch CardTrader data -> cloud/web/data.json
-        run: node cloud/fetch-cardtrader.js
-        env:
-          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
       - name: Copy shared UI into the site
         run: cp shared/ui.css shared/render.js shared/app.js cloud/web/
       - uses: actions/configure-pages@v6
