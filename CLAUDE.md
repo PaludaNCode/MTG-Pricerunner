@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MTG card price watcher (Japanese printings) with two deployments sharing one UI:
 
 - **Local watcher** (`local/`): Node server on `http://localhost:8787` that scrapes CardTrader (public website JSON) and Cardmarket (via the user's own Chrome over CDP on port 9222, to ride an already-cleared Cloudflare session). Started with `local\start-watcher.cmd`, usually already running in the background.
-- **Cloud site** (`cloud/`): GitHub Pages at https://paludancode.github.io/MTG-Pricerunner/, rebuilt by `.github/workflows/update.yml` on a `*/5` cron and on every push to `main`. CardTrader only.
+- **Cloud site** (`cloud/`): GitHub Pages at https://paludancode.github.io/MTG-Pricerunner/. CardTrader only. Two decoupled workflows:
+  - `.github/workflows/update.yml` ("Deploy site") publishes to Pages **only on push to `main`** (UI/source changes).
+  - `.github/workflows/update-data.yml` ("Update card data") runs on a `2-57/5` cron (GitHub best-effort; empirically fires every few hours, not every 5 min) and force-pushes `data.json` as a **single orphan commit to the `data` branch**. The Pages-hosted page fetches it from `raw.githubusercontent.com/.../data/data.json` — fresh data needs no deploy. The `data` branch is a build artifact: never branch from it or PR into it. For true ~5-min cadence, an external pinger can hit the workflow's `workflow_dispatch` endpoint — see `docs/external-pinger.md`.
 
 ## Commands
 
@@ -43,7 +45,7 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 One UI, two data plumbings — keep it that way:
 
 - `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid; also computes new-offer alerts via the `seen` set.
-- `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`.
+- `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
 - `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact + Qty/Src columns collapsed).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). Both fetchers and the local server consume it.
 - The local server serves `shared/` files via routes; the deploy workflow `cp`s them into `cloud/web/`. Copies inside `cloud/web/` (`ui.css`, `render.js`, `app.js`, `data.json`) are build artifacts and gitignored.

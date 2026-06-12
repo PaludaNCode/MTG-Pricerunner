@@ -18,7 +18,9 @@
 <div id="grid"></div>
 <div id="watching" class="watching"></div>
 
-<script>window.DASH = { url: "data.json", intervalMs: 60000, showSrc: false };</script>
+<!-- On Pages, data comes from the `data` branch (updated by update-data.yml without a deploy);
+     on localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
+<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000, showSrc: false };</script>
 <script src="render.js"></script>
 <script src="app.js"></script>
 </body>
