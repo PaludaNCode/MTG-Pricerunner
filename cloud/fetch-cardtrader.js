@@ -87,6 +87,10 @@ async function fetchCard(product, rates) {
     results.push(r);
     if (i < products.length - 1) await sleep(WAIT_MS);
   }
+  if (results.length && results.every((r) => r.error)) {
+    console.error("all cards errored — not writing data.json so the last good data survives");
+    process.exit(1);
+  }
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), results }, null, 0));
   console.log("wrote " + OUT);

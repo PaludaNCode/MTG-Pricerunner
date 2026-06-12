@@ -1,4 +1,5 @@
 node_modules/
+docs/analysis/
 cloud/web/data.json
 cloud/web/ui.css
 cloud/web/render.js
