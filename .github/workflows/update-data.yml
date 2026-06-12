@@ -1,0 +1,53 @@
+name: Update card data
+
+on:
+  schedule:
+    - cron: "2-57/5 * * * *" # offset from :00/:05 — GitHub's scheduler is least contended off the round minutes
+  workflow_dispatch: {} # manual run button + external pinger target
+  push:
+    branches: [main]
+    paths: ["config.json", "cloud/fetch-cardtrader.js", "shared/cards.js", ".github/workflows/update-data.yml"]
+
+permissions:
+  contents: write # force-push the data branch
+  actions: write # keepalive step re-enables this workflow
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# a delayed cron pile-up should collapse to the newest run
+concurrency:
+  group: data
+  cancel-in-progress: true
+
+jobs:
+  publish-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Fetch CardTrader data -> cloud/web/data.json
+        run: node cloud/fetch-cardtrader.js
+        env:
+          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+      # The data branch is a build artifact: a single orphan commit, force-pushed
+      # every run so history never grows. Never branch from it or PR into it.
+      - name: Publish data.json to the data branch
+        run: |
+          d=$(mktemp -d)
+          cp cloud/web/data.json "$d/"
+          cd "$d"
+          git init -b data
+          git add data.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "data $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # Scheduled workflows are auto-disabled after 60 days without repo activity;
+      # re-enabling on every run resets that clock deterministically.
+      - name: Keepalive
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-data.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
