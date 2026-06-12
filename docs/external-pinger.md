@@ -7,10 +7,16 @@ get reliable cadence on the free tier. The in-repo cron stays as a fallback.
 
 ## 1. Create a fine-grained PAT
 
-GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token:
+Direct link: https://github.com/settings/personal-access-tokens/new (logged in as PaludaNCode;
+the entry point is otherwise Settings → Developer settings, at the very bottom of the sidebar).
 
-- **Repository access**: Only select repositories → `PaludaNCode/MTG-Pricerunner`
-- **Permissions**: Repository permissions → **Actions: Read and write** (nothing else)
+- **Resource owner**: `PaludaNCode`
+- **Repository access**: **"Only select repositories"** → `PaludaNCode/MTG-Pricerunner`.
+  Gotcha: the "Public repositories (read-only)" option hides the whole permissions
+  section — pick it and "Actions: Read and write" never appears.
+- **Permissions** (section appears only after the step above): expand "Repository
+  permissions" → **Actions: Read and write** (nothing else; auto-added "Metadata:
+  Read-only" is expected).
 - Expiration: 1 year (set a reminder to rotate)
 
 ## 2. Test the dispatch call
