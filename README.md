@@ -37,7 +37,11 @@ Trunk-based, short-lived branches:
 1. Branch off `main`: `feat/<thing>` or `fix/<thing>`
 2. Push, open a PR — CI runs (JS syntax check + UI smoke test at three viewports)
 3. Merge when green. Merging to `main` **is** the release: the deploy workflow
-   fires on push to `main` and publishes to GitHub Pages.
+   fires on push to `main` and publishes to GitHub Pages. UI changes can take up
+   to ~20 min to show up in the browser (Pages CDN caches files for 10 min and a
+   deploy doesn't purge it; the browser caches its copy for 10 more) — and a tab
+   that's already open never picks up new UI at all, since the page only refetches
+   `data.json`. When in doubt, test in a private tab.
 
 `main` is protected: PRs need the `checks` job green before merge; force-pushes and
 deletion are blocked. Repo admins can push directly in a pinch (escape hatch — prefer PRs).
@@ -64,5 +68,6 @@ overflow or an empty grid. Uses live `cloud/web/data.json` when present, else th
 
 ## Adding a card
 
-Add an entry to `cards` in `config.json` (CardTrader or Cardmarket URL + `group` + `variant`),
+Add an entry to `cards` in `config.json` (CardTrader or Cardmarket URL + `group` + `variant`
+\+ `code`, the official Scryfall set code shown on phones — CI fails if it's missing),
 commit to `main`. The next scheduled run picks it up; the local watcher reloads config on the fly.
