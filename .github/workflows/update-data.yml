@@ -45,6 +45,11 @@ jobs:
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      # The cloud site fetches data.json via jsDelivr (raw.githubusercontent's CDN ignores
+      # query strings, so its max-age=300 can't be busted). Purge jsDelivr after each push so
+      # the new data goes live immediately instead of waiting out its cache TTL.
+      - name: Purge jsDelivr cache
+        run: curl -sf "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@data/data.json" || true
       # Scheduled workflows are auto-disabled after 60 days without repo activity;
       # re-enabling on every run resets that clock deterministically.
       - name: Keepalive
