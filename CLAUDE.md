@@ -46,11 +46,11 @@ One UI, two data plumbings — keep it that way:
 
 - `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid; also computes new-offer alerts via the `seen` set.
 - `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
-- `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact + Qty/Src columns collapsed).
+- `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact, Src column collapsed, Set column shows the official set code instead of the full variant name).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). Both fetchers and the local server consume it.
 - The local server serves `shared/` files via routes; the deploy workflow `cp`s them into `cloud/web/`. Copies inside `cloud/web/` (`ui.css`, `render.js`, `app.js`, `data.json`) are build artifacts and gitignored.
 
-Data shape contract (produced by both `local/server.js` and `cloud/fetch-cardtrader.js`, consumed by `render.js`): `{ updatedAt, results: [{ site, group, variant, productUrl, error?, offers: [{ price, priceStr, foil, condition, qty, seller, shipsToMe }] }] }`. Offers are merged per `group` and sorted by price client-side.
+Data shape contract (produced by both `local/server.js` and `cloud/fetch-cardtrader.js`, consumed by `render.js`): `{ updatedAt, results: [{ site, group, variant, code, productUrl, error?, offers: [{ price, priceStr, foil, condition, qty, seller, shipsToMe }] }] }`. Offers are merged per `group` and sorted by price client-side. `code` is the official Scryfall set code from `config.json`, shown instead of `variant` on phones; `render.js` falls back to `variant` when it's missing (data.json predating the field).
 
 ## Hard-won gotchas
 
@@ -59,3 +59,4 @@ Data shape contract (produced by both `local/server.js` and `cloud/fetch-cardtra
 - `shipsToMe` means different things per site: CardTrader = CardTrader Zero (hub) eligibility; Cardmarket = actually ships to the logged-in user's country (null when logged out).
 - Cardmarket fetching modes (`config.json` → `cardmarketFetch`): `cdp` (default, scrape via user's Chrome), `curl` (works until Cloudflare rate-limits), `off`. Details in the comments in `local/server.js`.
 - `gh` lives at `C:\Program Files\GitHub CLI\gh.exe` — shells opened before its install don't have it on PATH.
+- **UI changes take up to ~20 min to appear on phones after merging.** GitHub Pages serves everything with `Cache-Control: max-age=600` and a deploy doesn't purge the CDN: an edge that re-caches the old files right after the deploy serves them for another 10 min, and the browser then caches *that* copy for 10 more. On top of that, an already-open tab **never** picks up new UI — `app.js` only refetches `data.json`, so the header timestamp stays fresh while HTML/JS/CSS stay stale. Before debugging a "deploy didn't work" report: check the Deploy run's commit, wait out the cache window, and test in a private tab (separate cache). `data.json` is unaffected (different URL, `raw.githubusercontent.com`, max-age=300).
