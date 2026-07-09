@@ -39,6 +39,13 @@ test("no duplicate cardtrader entries (same blueprintId)", () => {
   assert.equal(new Set(ids).size, ids.length, "duplicate blueprintId in config.json");
 });
 
+test("every card entry has an official set code (shown on phones)", () => {
+  const cfg = JSON.parse(raw);
+  for (const p of normalizeCards(cfg)) {
+    assert.ok(p.code, `missing "code" for ${p.name}`);
+  }
+});
+
 test("no duplicate cardmarket entries (same url)", () => {
   const cfg = JSON.parse(raw);
   const urls = normalizeCards(cfg)
