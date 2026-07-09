@@ -13,6 +13,19 @@
     return '<span class="unk">?</span>';
   }
 
+  // Short set code for the phone layout ("Outlaws of Thunder Junction" -> OTJ,
+  // "Commander 2016" -> C16, "Strixhaven" -> STR). Variants are free text from
+  // config.json, so this is a heuristic, not a lookup of official set codes.
+  const STOP_WORDS = new Set(["of", "the", "and"]);
+  function setCode(variant) {
+    const v = String(variant || "").trim();
+    if (v.length <= 4) return v.toUpperCase();
+    const words = v.split(/[\s-]+/).filter((w) => w && !STOP_WORDS.has(w.toLowerCase()));
+    if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+    const parts = words.map((w) => (/^\d+$/.test(w) ? w.slice(-2) : w.length <= 3 && /\d/.test(w) ? w : w[0]));
+    return parts.join("").slice(0, 4).toUpperCase();
+  }
+
   function columns(opts) {
     const cols = [
       { key: "price", label: "Price", cell: (o) => esc(o.priceStr || "–") + (o.foil ? ' <span class="foil">✦</span>' : "") },
@@ -22,7 +35,7 @@
     if (opts.showShips) cols.push({ key: "ship", label: opts.shipLabel || "Ship", cell: shipCell });
     if (opts.showSrc) cols.push({ key: "src", label: "Src", cell: (o) => SRC[o._site] || o._site });
     cols.push({ key: "seller", label: "Seller", cell: (o) => esc(o.seller) });
-    cols.push({ key: "set", label: "Set", cell: (o) => `<a href="${esc(o._url)}" target="_blank">${esc(o._variant)}</a>` });
+    cols.push({ key: "set", label: "Set", cell: (o) => `<a href="${esc(o._url)}" target="_blank"><span class="set-full">${esc(o._variant)}</span><span class="set-code">${esc(setCode(o._variant))}</span></a>` });
     return cols;
   }
 
