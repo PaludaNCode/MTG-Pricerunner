@@ -2,7 +2,7 @@ name: Deploy site
 
 # Deploys only when the UI/source actually changes. Data freshness is handled
 # by update-data.yml, which publishes data.json to the `data` branch — the
-# cloud page fetches it via jsDelivr (cdn.jsdelivr.net/gh/...@data), no deploy needed.
+# cloud page fetches it from raw.githubusercontent.com (max-age=300, self-heals), no deploy needed.
 on:
   workflow_dispatch: {} # manual run button
   push:

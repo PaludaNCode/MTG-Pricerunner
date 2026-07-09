@@ -45,11 +45,10 @@ jobs:
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      # The cloud site fetches data.json via jsDelivr (raw.githubusercontent's CDN ignores
-      # query strings, so its max-age=300 can't be busted). Purge jsDelivr after each push so
-      # the new data goes live immediately instead of waiting out its cache TTL.
-      - name: Purge jsDelivr cache
-        run: curl -sf "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@data/data.json" || true
+      # No CDN purge step: the cloud page reads data.json straight from raw.githubusercontent,
+      # whose Fastly cache is max-age=300 and self-heals every ~5 min. jsDelivr was tried but its
+      # purge API is rate-limited (throttled when called every run) and it caches @branch refs
+      # ~12h, which pinned the site on stale snapshots — worse than raw for this update cadence.
       # Scheduled workflows are auto-disabled after 60 days without repo activity;
       # re-enabling on every run resets that clock deterministically.
       - name: Keepalive
