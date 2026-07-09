@@ -19,11 +19,12 @@
 <div id="watching" class="watching"></div>
 
 <!-- On Pages, data comes from the `data` branch (updated by update-data.yml without a deploy),
-     served via jsDelivr: raw.githubusercontent's Fastly CDN strips the query string from its
-     cache key, so the app.js cache-buster can't beat its max-age=300. jsDelivr honors query
-     strings and is purged at the end of each update-data.yml run, so prices go live immediately.
+     served from raw.githubusercontent.com. Its Fastly CDN caches max-age=300, so staleness is
+     bounded to ~5 min and self-heals every cycle — a good fit for the ~2-5 min update cadence.
+     We deliberately do NOT use jsDelivr here: it caches @branch refs for ~12h and its purge API
+     is rate-limited, so purging every run gets throttled and the site sticks on a stale snapshot.
      On localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
-<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://cdn.jsdelivr.net/gh/PaludaNCode/MTG-Pricerunner@data/data.json" : "data.json", intervalMs: 60000, showSrc: false };</script>
+<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000, showSrc: false };</script>
 <script src="render.js"></script>
 <script src="app.js"></script>
 </body>
