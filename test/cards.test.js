@@ -50,6 +50,18 @@ test("legacy explicit entries ({ site, blueprintId }) still work", () => {
   assert.equal(p.productUrl, "https://www.cardtrader.com/en/cards/99");
 });
 
+test("set code passes through and defaults to null", () => {
+  const cfg = {
+    cards: [
+      { url: "https://www.cardtrader.com/en/cards/1", group: "A", variant: "Zendikar Rising", code: "ZNR" },
+      { url: "https://www.cardtrader.com/en/cards/2", group: "B", variant: "Prerelease" },
+    ],
+  };
+  const [a, b] = normalizeCards(cfg);
+  assert.equal(a.code, "ZNR");
+  assert.equal(b.code, null);
+});
+
 test("group falls back to name when omitted", () => {
   const [p] = normalizeCards({ cards: [{ url: "https://www.cardtrader.com/en/cards/5", name: "Some Card" }] });
   assert.equal(p.group, "Some Card");

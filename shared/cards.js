@@ -1,5 +1,6 @@
 // Normalizes the easy "paste a URL" config into full product objects.
-// Config card shape: { url, group, variant, language? }
+// Config card shape: { url, group, variant, code?, language? }
+//   - code is the official (Scryfall) set code, shown instead of variant on phones
 //   - site is derived from the URL host (cardtrader.com / cardmarket.com)
 //   - blueprintId is extracted from a CardTrader URL (/cards/<id>-...)
 //   - language defaults to config.defaultLanguage
@@ -32,6 +33,7 @@ function normalizeCards(cfg) {
         url: c.url,
         group: c.group || name,
         variant: c.variant || "",
+        code: c.code || null,
         language,
         name,
         productUrl,
