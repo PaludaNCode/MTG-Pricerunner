@@ -33,6 +33,7 @@
     { "url": "https://www.cardtrader.com/en/cards/27073-windswept-heath-onslaught", "group": "Windswept Heath", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/19334-arid-mesa-zendikar", "group": "Arid Mesa", "variant": "Zendikar", "code": "ZEN" },
     { "url": "https://www.cardtrader.com/en/cards/19316-verdant-catacombs-zendikar", "group": "Verdant Catacombs", "variant": "Zendikar", "code": "ZEN" },
+    { "url": "https://www.cardtrader.com/en/cards/393436-hex-magic-marvel-super-heroes", "group": "Hex Magic", "variant": "Marvel Super Heroes", "code": "MSH" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven/Flow-State?language=7", "group": "Flow State", "variant": "Strixhaven", "code": "SOS" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven-Mystical-Archive/Stock-Up-V1?language=7", "group": "Stock Up", "variant": "Mystical Archive V1", "code": "SOA" },
