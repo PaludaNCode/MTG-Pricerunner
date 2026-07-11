@@ -4,7 +4,7 @@
 // the checked-in sources in the repo root and shared/ stay the single source of truth.
 const { app } = require("@azure/functions");
 const { BlobServiceClient } = require("@azure/storage-blob");
-const { scrapeAll } = require("../../lib/scrape");
+const { scrapeAll, shouldPublish } = require("../../lib/scrape");
 const { normalizeCards } = require("../../lib/cards");
 const config = require("../../config.json");
 
@@ -14,7 +14,7 @@ app.timer("updateData", {
   handler: async (_timer, context) => {
     const products = normalizeCards(config).filter((p) => p.site === "cardtrader");
     const { updatedAt, results } = await scrapeAll(products, (m) => context.log(m));
-    if (results.length && results.every((r) => r.error)) {
+    if (!shouldPublish(results)) {
       context.error("all cards errored — keeping the previous data.json");
       return;
     }

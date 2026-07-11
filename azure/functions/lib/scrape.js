@@ -7,8 +7,12 @@
 // Zero-dependency (Node 18+ global fetch); the caller supplies normalized products.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const WAIT_MS = 2000; // pace between cards (429 backoff below handles bursts)
-const PAGE_WAIT_MS = 400; // pace between pages of one card
+// Pacing knobs live in one mutable object so tests can zero them out.
+const TUNING = {
+  cardWaitMs: 2000, // pace between cards (429 backoff below handles bursts)
+  pageWaitMs: 400, // pace between pages of one card
+  rateLimitBackoffMs: 2000, // base backoff after a 429, doubles per retry
+};
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 async function getRates() {
@@ -63,7 +67,7 @@ async function fetchCard(product, rates) {
     for (let tries = 0; tries < 4; tries++) {
       res = await fetch(`${base}?page=${page}`, { headers: { "User-Agent": UA, Accept: "application/json" } });
       if (res.status !== 429) break;
-      await sleep(2000 * (tries + 1)); // back off hard on rate limit
+      await sleep(TUNING.rateLimitBackoffMs * (tries + 1)); // back off hard on rate limit
     }
     if (!res.ok) {
       if (page === 1) return { ...product, productUrl: cardUrl(product), offers: [], error: "HTTP " + res.status };
@@ -73,7 +77,7 @@ async function fetchCard(product, rates) {
     const pageProducts = data.products || [];
     offers.push(...mapPageOffers(pageProducts, product, rates));
     if (data.products_last_page_reached || pageProducts.length === 0) break;
-    await sleep(PAGE_WAIT_MS);
+    await sleep(TUNING.pageWaitMs);
   }
   return { ...product, productUrl: cardUrl(product), offers };
 }
@@ -88,9 +92,13 @@ async function scrapeAll(products, log = () => {}) {
     const r = await fetchCard(p, rates);
     log(`[${i + 1}/${products.length}] ${p.name} … ${r.offers.length} offers${r.error ? " (" + r.error + ")" : ""}`);
     results.push(r);
-    if (i < products.length - 1) await sleep(WAIT_MS);
+    if (i < products.length - 1) await sleep(TUNING.cardWaitMs);
   }
   return { updatedAt: new Date().toISOString(), results };
 }
 
-module.exports = { scrapeAll, mapPageOffers, toEur };
+// Publish unless the whole run failed — a total failure (site down, Cloudflare block)
+// must keep the previous data.json instead of wiping the site.
+const shouldPublish = (results) => !(results.length && results.every((r) => r.error));
+
+module.exports = { scrapeAll, fetchCard, mapPageOffers, toEur, shouldPublish, TUNING };
