@@ -22,11 +22,27 @@ from an EU IP to see EU sellers — hence Azure, EU region.
   until the `AZURE_FUNCTIONAPP_NAME` repo variable exists**, so this can merge before
   Azure is provisioned.
 
+## Picking a region empirically (optional, recommended)
+
+The scrape's offer list reflects the *function's* IP country, not yours — and Azure IP
+ranges don't always geolocate to the region's physical country, nor does Cloudflare
+treat all datacenter ranges equally. Before provisioning, probe the candidates from
+Cloud Shell (works from the Azure mobile app too):
+
+```bash
+curl -s https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/main/azure/region-probe.sh | bash
+```
+
+It launches a throwaway Container Instance per EU region, prints each region's egress
+IP geolocation and CardTrader offer counts (Cloudflare blocks show up as NON-JSON/403),
+then deletes everything. Pick the region whose JP offer counts best match the Pages
+site and whose `geo=` is closest to DK. Until this branch is merged, add `REF=<branch>`
+before `bash` so the probe script's JS half resolves.
+
 ## One-time provisioning (Azure Cloud Shell, bash)
 
-Pick the region closest to you — the scrape's offer list reflects the *function's* IP
-country, not yours. `westeurope` (Netherlands) is a good proxy for Denmark; EU sellers
-that ship NL almost always ship DK.
+Pick the region the probe liked best. `westeurope` (Netherlands) is a reasonable
+default for Denmark; EU sellers that ship NL almost always ship DK.
 
 ```bash
 RG=mtg-pricerunner
