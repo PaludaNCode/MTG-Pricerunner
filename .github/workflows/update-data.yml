@@ -1,12 +1,25 @@
-# TEMPORARILY OVERRIDDEN ON THIS BRANCH ONLY: dispatching "Update card data" with
-# ref=claude/cache-issues-acquisition-nx6ai9 runs this cache diagnostic instead of
-# publishing data. main's copy is untouched; restore before merging.
 name: Update card data
+
 on:
-  workflow_dispatch: {}
-permissions: {}
+  schedule:
+    - cron: "2-57/5 * * * *" # offset from :00/:05 — GitHub's scheduler is least contended off the round minutes
+  workflow_dispatch: {} # manual run button + external pinger target
+  push:
+    branches: [main]
+    paths: ["config.json", "cloud/fetch-cardtrader.js", "shared/cards.js", ".github/workflows/update-data.yml"]
+
+permissions:
+  contents: write # force-push the data branch
+  actions: write # keepalive step re-enables this workflow
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# a delayed cron pile-up should collapse to the newest run
 concurrency:
-  group: data-cache-test
+  group: data
+  cancel-in-progress: true
+
 jobs:
   publish-data:
     runs-on: ubuntu-latest
@@ -15,7 +28,30 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - name: CardTrader API cache probe (no publishing)
-        run: node cloud/cache-test.js
+      - name: Fetch CardTrader data -> cloud/web/data.json
+        run: node cloud/fetch-cardtrader.js
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+      # The data branch is a build artifact: a single orphan commit, force-pushed
+      # every run so history never grows. Never branch from it or PR into it.
+      - name: Publish data.json to the data branch
+        run: |
+          d=$(mktemp -d)
+          cp cloud/web/data.json "$d/"
+          cd "$d"
+          git init -b data
+          git add data.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "data $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # No CDN purge step: the cloud page reads data.json straight from raw.githubusercontent,
+      # whose Fastly cache is max-age=300 and self-heals every ~5 min. jsDelivr was tried but its
+      # purge API is rate-limited (throttled when called every run) and it caches @branch refs
+      # ~12h, which pinned the site on stale snapshots — worse than raw for this update cadence.
+      # Scheduled workflows are auto-disabled after 60 days without repo activity;
+      # re-enabling on every run resets that clock deterministically.
+      - name: Keepalive
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-data.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
