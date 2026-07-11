@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-MTG card price watcher (Japanese printings) with two deployments sharing one UI:
+MTG card price watcher (Japanese printings) with three deployments sharing one UI:
 
 - **Local watcher** (`local/`): Node server on `http://localhost:8787` that scrapes CardTrader (public website JSON) and Cardmarket (via the user's own Chrome over CDP on port 9222, to ride an already-cleared Cloudflare session). Started with `local\start-watcher.cmd`, usually already running in the background.
 - **Cloud site** (`cloud/`): GitHub Pages at https://paludancode.github.io/MTG-Pricerunner/. CardTrader only. Two decoupled workflows:
   - `.github/workflows/update.yml` ("Deploy site") publishes to Pages **only on push to `main`** (UI/source changes).
   - `.github/workflows/update-data.yml` ("Update card data") runs on a `2-57/5` cron (GitHub best-effort; empirically fires every few hours, not every 5 min) and force-pushes `data.json` as a **single orphan commit to the `data` branch**. The Pages-hosted page fetches it from `raw.githubusercontent.com/.../data/data.json` — fresh data needs no deploy. The `data` branch is a build artifact: never branch from it or PR into it. For true ~5-min cadence, an external pinger can hit the workflow's `workflow_dispatch` endpoint — see `docs/external-pinger.md`.
+- **Azure site** (`azure/`): same UI, hosted on an Azure Storage static website in an EU region. Data comes from an Azure Functions timer (`azure/functions/`, every 5 min) scraping the **public website JSON** — fresh and EU-geo-correct, unlike the official API (see gotchas). Deployed by `.github/workflows/deploy-azure.yml` on push to `main`; the job is skipped until the `AZURE_FUNCTIONAPP_NAME` repo variable is set. One-time provisioning + secrets: `azure/README.md`. `azure/functions/config.json` and `azure/functions/lib/cards.js` are deploy-time copies (gitignored).
 
 ## Commands
 
@@ -42,10 +43,10 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 
 ## Architecture
 
-One UI, two data plumbings — keep it that way:
+One UI, three data plumbings — keep it that way:
 
 - `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid; also computes new-offer alerts via the `seen` set.
-- `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
+- `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html`, `cloud/web/index.html` and `azure/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline). The Azure page always uses relative `data.json` (same `$web` container).
 - `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact, Src column collapsed, Set column shows the official set code instead of the full variant name).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). Both fetchers and the local server consume it.
 - The local server serves `shared/` files via routes; the deploy workflow `cp`s them into `cloud/web/`. Copies inside `cloud/web/` (`ui.css`, `render.js`, `app.js`, `data.json`) are build artifacts and gitignored.
@@ -54,7 +55,8 @@ Data shape contract (produced by both `local/server.js` and `cloud/fetch-cardtra
 
 ## Hard-won gotchas
 
-- **CardTrader geo-filter:** the public website JSON (`/en/cards/<id>.json`) only returns offers shippable to the requester's IP country. That's why the cloud fetcher uses the authenticated official API (`api.cardtrader.com/api/v2/marketplace/products?blueprint_id=`, bearer token in the `CARDTRADER_TOKEN` repo secret) — full list, no pagination. Don't "simplify" it back to the website JSON.
+- **CardTrader geo-filter:** the public website JSON (`/en/cards/<id>.json`) only returns offers shippable to the requester's IP country. That's why the cloud fetcher uses the authenticated official API (`api.cardtrader.com/api/v2/marketplace/products?blueprint_id=`, bearer token in the `CARDTRADER_TOKEN` repo secret) — full list, no pagination. Don't "simplify" it back to the website JSON *on GitHub runners* (US IPs); the Azure fetcher uses the website JSON on purpose because it runs from an EU IP.
+- **CardTrader official API staleness:** `marketplace/products` serves stale data from inside their backend — sold listings were still returned 13+ hours after purchase (verified 2026-07-11: identical ETags with and without cache-busters/no-cache headers, `cf-cache-status: DYNAMIC`, so it's not an HTTP cache and cannot be bypassed client-side). The website JSON reflects sales immediately; that freshness is why the Azure deployment exists.
 - **Hiding table columns:** the tables use `table-layout: fixed` with class-based `<col>` widths (`col.c-price` etc., emitted by `render.js`). To hide a column responsively, set its `col` width to 0 and its cells' padding to 0 — `display: none` on cells shifts later cells into the wrong columns.
 - `shipsToMe` means different things per site: CardTrader = CardTrader Zero (hub) eligibility; Cardmarket = actually ships to the logged-in user's country (null when logged out).
 - Cardmarket fetching modes (`config.json` → `cardmarketFetch`): `cdp` (default, scrape via user's Chrome), `curl` (works until Cloudflare rate-limits), `off`. Details in the comments in `local/server.js`.

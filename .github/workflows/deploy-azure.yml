@@ -1,0 +1,52 @@
+name: Deploy Azure site
+
+# Deploys the Azure variant of the site: same shared UI, but data.json is produced by
+# an Azure Function (EU region) scraping the public CardTrader website JSON — fresh and
+# geo-correct, unlike the official marketplace API (serves sold listings for 13+ hours).
+# One-time provisioning + the secrets/variables this needs: see azure/README.md.
+# Until the AZURE_FUNCTIONAPP_NAME repo variable is set, the job is skipped entirely.
+on:
+  workflow_dispatch: {} # manual run button
+  push:
+    branches: [main]
+    paths: ["azure/**", "shared/**", "config.json", ".github/workflows/deploy-azure.yml"]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: azure-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.AZURE_FUNCTIONAPP_NAME != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20" # match the Function app runtime
+      - name: Assemble function package
+        # config.json and shared/cards.js are copied in (gitignored there) so the
+        # repo-root copies stay the single source of truth.
+        run: |
+          cp config.json azure/functions/config.json
+          cp shared/cards.js azure/functions/lib/cards.js
+          cd azure/functions && npm install --omit=dev
+      - name: Deploy function app
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          package: azure/functions
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+      - name: Upload site to the storage static website
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+        run: |
+          cp shared/ui.css shared/render.js shared/app.js azure/web/
+          az storage blob upload-batch --destination '$web' --source azure/web --overwrite \
+            --content-cache-control "public, max-age=300"

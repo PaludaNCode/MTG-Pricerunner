@@ -4,6 +4,13 @@ cloud/web/data.json
 cloud/web/ui.css
 cloud/web/render.js
 cloud/web/app.js
+azure/functions/config.json
+azure/functions/lib/cards.js
+azure/functions/package-lock.json
+azure/web/data.json
+azure/web/ui.css
+azure/web/render.js
+azure/web/app.js
 cloud/shot-*.png
 .cf-profile/
 chrome-debug/

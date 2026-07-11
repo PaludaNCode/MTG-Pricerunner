@@ -1,0 +1,12 @@
+{
+  "name": "mtg-pricerunner-azure-functions",
+  "private": true,
+  "main": "src/functions/*.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.7.0",
+    "@azure/storage-blob": "^12.28.0"
+  }
+}
