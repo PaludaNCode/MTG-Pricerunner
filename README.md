@@ -9,7 +9,7 @@ Two flavors, one identical UI — only the price import differs:
 | | Local watcher | Cloud site |
 |---|---|---|
 | Sources | CardTrader API + Cardmarket (scraped via your own Chrome over CDP) | CardTrader API only |
-| Refresh | rolling, one card every 5 s | GitHub Actions cron, ~every 5 min (best-effort) |
+| Refresh | rolling, one card every 5 s | GitHub Actions cron (nominally every 5 min, in practice every few hours — see below) |
 | Run | `local\start-watcher.cmd` → http://localhost:8787 | nothing — GitHub Pages |
 
 ## Layout
@@ -19,23 +19,43 @@ config.json          card watch list + watcher settings (shared by both)
 shared/              one UI for both dashboards: ui.css, render.js, app.js
 local/               Node watcher server + launcher scripts (Windows)
 cloud/               GitHub Actions fetcher + static site (cloud/web)
-  fetch-cardtrader.js  builds cloud/web/data.json from the CardTrader JSON API
+  fetch-cardtrader.js  builds data.json from the CardTrader API
   verify-mobile.js     UI smoke test (renders at 320/390/1440 px, fails on overflow)
   fixture-data.json    offline test data for CI
+test/                unit tests (node:test, zero deps) — run with `npm test`
+docs/                external-pinger.md — optional true-5-min data refresh
 .github/workflows/
-  update.yml           CD — fetch prices + deploy Pages (cron + push to main)
-  ci.yml               CI — syntax check + UI smoke test (pull requests)
+  update.yml           CD — deploy the site to Pages (push to main only)
+  update-data.yml      data refresh — cron + dispatch, publishes data.json to the `data` branch
+  ci.yml               CI — syntax check + unit tests + UI smoke test (pull requests)
 ```
 
 The deploy workflow copies `shared/` into the site at build time; `cloud/web/` build
 artifacts (`data.json`, copied UI files) are gitignored.
+
+## How cloud data updates work
+
+Site deploys and data refreshes are decoupled:
+
+- **`update.yml`** publishes the site to GitHub Pages, only when UI/source files
+  change on `main`. It never touches prices.
+- **`update-data.yml`** fetches prices and force-pushes `data.json` as a single
+  orphan commit to the **`data` branch**. The live page fetches it from
+  `raw.githubusercontent.com`, so fresh data needs no deploy. The `data` branch is
+  a build artifact — never branch from it or PR into it.
+
+The data workflow runs on a `2-57/5` cron, but GitHub's scheduler is best-effort:
+empirically it fires every few hours, not every 5 minutes. It also runs on pushes
+to `main` that touch `config.json` or the fetcher, and can be triggered manually
+(`workflow_dispatch`). For a true ~5-minute cadence, point an external pinger at
+the dispatch endpoint — see `docs/external-pinger.md`.
 
 ## Branching strategy
 
 Trunk-based, short-lived branches:
 
 1. Branch off `main`: `feat/<thing>` or `fix/<thing>`
-2. Push, open a PR — CI runs (JS syntax check + UI smoke test at three viewports)
+2. Push, open a PR — CI runs (JS syntax check + unit tests + UI smoke test at three viewports)
 3. Merge when green. Merging to `main` **is** the release: the deploy workflow
    fires on push to `main` and publishes to GitHub Pages. UI changes can take up
    to ~20 min to show up in the browser (Pages CDN caches files for 10 min and a
@@ -50,8 +70,9 @@ deletion are blocked. Repo admins can push directly in a pinch (escape hatch —
 
 Dependabot (`.github/dependabot.yml`) opens a weekly grouped PR per ecosystem when
 updates exist: one for GitHub Actions versions, one for npm. Treat them like any PR —
-CI must be green, then merge. If the repo sees no commits for 60 days GitHub pauses
-the cron schedule and emails the owner; re-enable under the Actions tab.
+CI must be green, then merge. GitHub normally pauses scheduled workflows after 60 days
+without repo activity, but `update-data.yml` re-enables itself on every run (Keepalive
+step), so no manual re-enabling is needed.
 
 ## UI rules
 
@@ -70,4 +91,5 @@ overflow or an empty grid. Uses live `cloud/web/data.json` when present, else th
 
 Add an entry to `cards` in `config.json` (CardTrader or Cardmarket URL + `group` + `variant`
 \+ `code`, the official Scryfall set code shown on phones — CI fails if it's missing),
-commit to `main`. The next scheduled run picks it up; the local watcher reloads config on the fly.
+and merge to `main` via PR. That push triggers an immediate data refresh; the local
+watcher reloads config on the fly.
