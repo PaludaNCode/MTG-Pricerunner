@@ -9,7 +9,7 @@ Two flavors, one identical UI — only the price import differs:
 | | Local watcher | Cloud site |
 |---|---|---|
 | Sources | CardTrader API + Cardmarket (scraped via your own Chrome over CDP) | CardTrader API only |
-| Refresh | rolling, one card every 5 s | GitHub Actions cron (nominally every 5 min, in practice every few hours — see below) |
+| Refresh | rolling, one card every 5 s | every ~2 min via an external pinger (see below) |
 | Run | `local\start-watcher.cmd` → http://localhost:8787 | nothing — GitHub Pages |
 
 ## Layout
@@ -23,7 +23,7 @@ cloud/               GitHub Actions fetcher + static site (cloud/web)
   verify-mobile.js     UI smoke test (renders at 320/390/1440 px, fails on overflow)
   fixture-data.json    offline test data for CI
 test/                unit tests (node:test, zero deps) — run with `npm test`
-docs/                external-pinger.md — optional true-5-min data refresh
+docs/                external-pinger.md — the cron-job.org pinger behind the ~2-min data refresh
 .github/workflows/
   update.yml           CD — deploy the site to Pages (push to main only)
   update-data.yml      data refresh — cron + dispatch, publishes data.json to the `data` branch
@@ -44,11 +44,12 @@ Site deploys and data refreshes are decoupled:
   `raw.githubusercontent.com`, so fresh data needs no deploy. The `data` branch is
   a build artifact — never branch from it or PR into it.
 
-The data workflow runs on a `2-57/5` cron, but GitHub's scheduler is best-effort:
-empirically it fires every few hours, not every 5 minutes. It also runs on pushes
-to `main` that touch `config.json` or the fetcher, and can be triggered manually
-(`workflow_dispatch`). For a true ~5-minute cadence, point an external pinger at
-the dispatch endpoint — see `docs/external-pinger.md`.
+In practice the refresh cadence comes from an **external pinger**: a cron-job.org
+job POSTs the workflow's `workflow_dispatch` endpoint every 2 minutes (setup and
+credentials: `docs/external-pinger.md`). The workflow also has a `2-57/5` in-repo
+cron, but GitHub's scheduler is best-effort — empirically it fires every few hours —
+so it only serves as a fallback if the pinger dies. Pushes to `main` that touch
+`config.json` or the fetcher trigger a run too.
 
 ## Branching strategy
 

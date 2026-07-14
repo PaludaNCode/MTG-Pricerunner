@@ -1,9 +1,13 @@
-# External pinger: real ~5-minute data updates
+# External pinger: real ~2-minute data updates
 
 GitHub's `schedule:` cron is best-effort. Measured on this repo (June 2026): the
 `*/5` cron fired every **2.5–4.6 hours**. `workflow_dispatch` runs immediately, so an
-external scheduler POSTing the dispatch endpoint every 5 minutes is the only way to
-get reliable cadence on the free tier. The in-repo cron stays as a fallback.
+external scheduler POSTing the dispatch endpoint is the only way to get reliable
+cadence on the free tier. The in-repo cron stays as a fallback.
+
+**Current setup (live):** a cron-job.org job pings the dispatch endpoint every
+**2 minutes**, so `data.json` refreshes at that cadence. The steps below document
+how it was set up / how to recreate it.
 
 ## 1. Create a fine-grained PAT
 
@@ -36,7 +40,8 @@ Expect HTTP 204 and a new "Update card data" run in the Actions tab within secon
 Create a job:
 
 - **URL**: `https://api.github.com/repos/PaludaNCode/MTG-Pricerunner/actions/workflows/update-data.yml/dispatches`
-- **Schedule**: every 5 minutes
+- **Schedule**: every 2 minutes (a coarser interval also works — over-pinging is
+  harmless, see Notes; each ping is one Actions run, free on public repos)
 - **Request method**: POST
 - **Headers**:
   - `Authorization: Bearer <PAT>`
