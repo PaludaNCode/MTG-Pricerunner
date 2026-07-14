@@ -34,6 +34,8 @@
     { "url": "https://www.cardtrader.com/en/cards/27071-wooded-foothills-onslaught", "group": "Wooded Foothills", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/27088-bloodstained-mire-onslaught", "group": "Bloodstained Mire", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/393436-hex-magic-marvel-super-heroes", "group": "Hex Magic", "variant": "Marvel Super Heroes", "code": "MSH" },
+    { "url": "https://www.cardtrader.com/en/cards/393383-shuri-wakandan-inventor-marvel-super-heroes", "group": "Shuri, Wakandan Inventor", "variant": "Marvel Super Heroes", "code": "MSH" },
+    { "url": "https://www.cardtrader.com/cards/396357-shuri-wakandan-inventor-marvel-super-heroes-promos", "group": "Shuri, Wakandan Inventor", "variant": "Promos", "code": "PMSH" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven/Flow-State?language=7", "group": "Flow State", "variant": "Strixhaven", "code": "SOS" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven-Mystical-Archive/Stock-Up-V1?language=7", "group": "Stock Up", "variant": "Mystical Archive V1", "code": "SOA" },
