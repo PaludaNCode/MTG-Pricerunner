@@ -6,7 +6,9 @@
 (function () {
   const cfg = window.DASH || {};
   let firstRun = true;
-  const seen = new Set();
+  const seen = new Set();      // every offer key observed this session
+  const newKeys = new Set();   // offers that appeared after first load (highlighted)
+  const recentNew = new Map(); // group -> when it last gained an offer (sorts to top)
   const $ = (id) => document.getElementById(id);
 
   function notify(title, body) {
@@ -37,7 +39,7 @@
     try {
       const sep = cfg.url.includes("?") ? "&" : "?";
       const data = await (await fetch(cfg.url + sep + "t=" + Date.now())).json();
-      const { totalOffers, newAlerts } = CardUI.renderGrid(data, { showShips: true, showSrc: cfg.showSrc !== false, seen, firstRun });
+      const { totalOffers, newAlerts } = CardUI.renderGrid(data, { showShips: true, showSrc: cfg.showSrc !== false, seen, firstRun, newKeys, recent: recentNew });
       if (newAlerts.length) notify("New JP listing!", newAlerts.join("\n"));
       $("fetching").textContent = data.current ? "⏳ " + data.current : "";
       $("updated").textContent =
