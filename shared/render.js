@@ -1,5 +1,8 @@
 // Shared dashboard renderer for both the local watcher and the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun }) -> { totalOffers, newAlerts }
+// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent }) -> { totalOffers, newAlerts }
+// seen: Set of every offer key observed this session (drives the alert diff).
+// newKeys: Set of offer keys that appeared *after* first load (rows get highlighted).
+// recent: Map of group -> timestamp of its latest new offer (groups float to the top).
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
@@ -47,7 +50,7 @@
     }
 
     let totalOffers = 0;
-    const empty = []; const errored = new Set(); const newAlerts = [];
+    const empty = []; const errored = new Set(); const newAlerts = []; const cards = [];
     for (const g of order) {
       let merged = [];
       for (const p of groups[g]) {
@@ -58,17 +61,39 @@
       if (!merged.length) { empty.push(g); continue; }
       totalOffers += merged.length;
 
-      const rows = merged.map((o) => {
-        if (opts.seen) {
-          const key = g + "#" + o._variant + "#" + o._site + "#" + o.seller + "#" + o.price;
-          if (!opts.seen.has(key)) { opts.seen.add(key); if (!opts.firstRun) newAlerts.push(`${g} (${o._variant}): ${o.priceStr} from ${o.seller || "?"}`); }
+      // Diff against the session's seen set: offers appearing after first load
+      // get remembered in newKeys (row highlight) and bump the group in recent
+      // (sorts it to the top below).
+      let newCount = 0;
+      for (const o of merged) {
+        const key = g + "#" + o._variant + "#" + o._site + "#" + o.seller + "#" + o.price;
+        o._new = opts.newKeys ? opts.newKeys.has(key) : false;
+        if (opts.seen && !opts.seen.has(key)) {
+          opts.seen.add(key);
+          if (!opts.firstRun) {
+            newAlerts.push(`${g} (${o._variant}): ${o.priceStr} from ${o.seller || "?"}`);
+            if (opts.newKeys) { opts.newKeys.add(key); o._new = true; }
+            if (opts.recent) opts.recent.set(g, Date.now());
+          }
         }
-        return `<tr class="${priceClass(o.price)}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>";
-      }).join("");
+        if (o._new) newCount++;
+      }
+      cards.push({ g, merged, newCount });
+    }
+
+    // Groups that gained offers this session float to the top, most recent
+    // first; ties (and everything else) keep the config.json order.
+    const rank = (g) => (opts.recent && opts.recent.get(g)) || 0;
+    cards.sort((a, b) => rank(b.g) - rank(a.g));
+
+    for (const { g, merged, newCount } of cards) {
+      const rows = merged.map((o) =>
+        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
+      ).join("");
 
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `<h2><span>${esc(g)}</span><span class="badge">${merged.length}</span></h2>
+      card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges">${newCount ? `<span class="badge badge-new">+${newCount} new</span>` : ""}<span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}</table>`;
       grid.appendChild(card);
     }
