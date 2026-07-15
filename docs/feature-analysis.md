@@ -49,6 +49,48 @@ marketplace search. Our fetcher paces at 1 request / 250 ms for ~33 cards (~10 s
 per run) — an order of magnitude of headroom for more cards or extra
 metadata calls.
 
+## 2b. Cardmarket Price Guide — free daily market prices, no scraping
+
+Cardmarket publishes its **[Price Guide](https://www.cardmarket.com/en/Magic/Data/Price-Guide)**
+(under *Data → Price Guide*) as downloadable files, free for everyone since their
+[2023 announcement](https://news.cardmarket.com/en/Magic/were-making-the-price-guide-and-product-catalogue-available-for-download)
+— previously API-users-only. Key facts:
+
+- **Formats:** gzipped CSV and JSON, refreshed **once per day**. Download URLs are
+  linked from the Price Guide page and live on their S3 downloads host, per game
+  (Magic = game id 1) — reportedly
+  `downloads.s3.cardmarket.com/productCatalog/priceGuide/price_guide_1.json`, with a
+  matching `productList/products_singles_1.json` catalogue (verify the exact URLs on
+  the page; they weren't reachable from this analysis sandbox).
+- **Per-product metrics** ([field docs](https://api.cardmarket.com/ws/documentation/API_2.0:PriceGuide)):
+  `idProduct`, Avg. Sell Price, **Low Price**, **Trend Price**, German Pro Low,
+  Suggested Price, plus **AVG1 / AVG7 / AVG30** (average *sale* price over the last
+  1/7/30 days) — each in a non-foil and a foil variant.
+- **No login, no Cloudflare drama:** these are static file downloads, so a GitHub
+  Actions runner can fetch them — unlike the Cardmarket offer pages, which need the
+  local CDP/Chrome dance.
+- **Caveat:** the guide is per *product* (printing), aggregated across **all
+  languages** — there is no JP-only trend price. It's a reference baseline, not a
+  substitute for the offer-level JP data we scrape.
+
+**Mapping to our cards is already solved:** CardTrader's `blueprints/export`
+returns `card_market_ids`, and Scryfall returns `cardmarket_id` — either one links
+a watched blueprint to `idProduct` in the price guide with no manual config.
+
+This unlocks two features directly:
+
+- **Deal detection (feeds F1/F2):** show each card's Trend/AVG7 next to the lowest
+  live offer and flag offers meaningfully below trend — "4.20 € vs 7.80 € trend" is
+  a much stronger alert signal than a raw threshold, and thresholds could even
+  default to a % of trend.
+- **Cloud-side Cardmarket presence at last:** the cloud site can't scrape
+  Cardmarket offers, but it *can* show daily Cardmarket trend/low prices per card
+  as a reference column — closing part of the local-vs-cloud feature gap for free.
+
+The daily file covers all ~100k Magic products (a few MB gzipped); the data
+workflow would download it once a day (cache by `Last-Modified`), pluck the
+handful of `idProduct`s we watch, and write them into `data.json`.
+
 ## 3. Feature ideas, ranked
 
 ### Tier 1 — high value, low effort, both deployments
@@ -136,3 +178,7 @@ what a good price *is*, thresholds (F1) encode it, push (F6) delivers it with th
 tab closed. All three fit the existing architecture (config → workflow → data
 branch → shared renderer) without new infrastructure, and F1 alone is shippable
 in one small PR.
+
+The Cardmarket Price Guide (§2b) slots straight into that slice: it gives every
+watched card a daily Trend/AVG7 baseline for one HTTP download a day, making both
+the Δ badges and the alert thresholds *market-relative* instead of hand-tuned.
