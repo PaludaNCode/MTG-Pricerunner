@@ -1,6 +1,6 @@
 // Shared dashboard renderer for both the local watcher and the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent }) -> { totalOffers, newAlerts }
-// seen: Set of every offer key observed this session (drives the alert diff).
+// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent }) -> { totalOffers }
+// seen: Set of every offer key observed this session (drives the new-offer diff).
 // newKeys: Set of offer keys that appeared *after* first load (rows get highlighted).
 // recent: Map of group -> timestamp of its latest new offer (groups float to the top).
 // Expects #grid and #watching elements in the page.
@@ -50,7 +50,7 @@
     }
 
     let totalOffers = 0;
-    const empty = []; const errored = new Set(); const newAlerts = []; const cards = [];
+    const empty = []; const errored = new Set(); const cards = [];
     for (const g of order) {
       let merged = [];
       for (const p of groups[g]) {
@@ -71,7 +71,6 @@
         if (opts.seen && !opts.seen.has(key)) {
           opts.seen.add(key);
           if (!opts.firstRun) {
-            newAlerts.push(`${g} (${o._variant}): ${o.priceStr} from ${o.seller || "?"}`);
             if (opts.newKeys) { opts.newKeys.add(key); o._new = true; }
             if (opts.recent) opts.recent.set(g, Date.now());
           }
@@ -102,7 +101,7 @@
       watching.innerHTML = `<div class="label">Watching · no offers yet (${empty.length})</div>
         <div class="chips">${empty.map((g) => `<span class="chip${errored.has(g) ? " err" : ""}">${esc(g)}</span>`).join("")}</div>`;
     }
-    return { totalOffers, newAlerts };
+    return { totalOffers };
   }
 
   global.CardUI = { renderGrid };
