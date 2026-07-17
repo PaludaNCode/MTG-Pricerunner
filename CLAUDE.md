@@ -44,8 +44,8 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 
 One UI, two data plumbings — keep it that way:
 
-- `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid; also computes new-offer alerts via the `seen` set.
-- `shared/app.js` — page bootstrap (fetch loop, notifications, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
+- `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid; also highlights new offers (and floats their groups to the top) via the `seen` set.
+- `shared/app.js` — page bootstrap (fetch loop, status line). Pages configure it with `window.DASH = { url, intervalMs, showSrc? }` — that one line is the *only* intended difference between `local/index.html` and `cloud/web/index.html`. The cloud page's `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
 - `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact, Src column collapsed, Set column shows the official set code instead of the full variant name).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). Both fetchers and the local server consume it.
 - The local server serves `shared/` files via routes; the deploy workflow `cp`s them into `cloud/web/`. Copies inside `cloud/web/` (`ui.css`, `render.js`, `app.js`, `data.json`) are build artifacts and gitignored.
