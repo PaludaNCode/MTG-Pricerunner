@@ -1,8 +1,9 @@
 // Shared dashboard renderer for both the local watcher and the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent }) -> { totalOffers }
+// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent, newWindowMs }) -> { totalOffers }
 // seen: Set of every offer key observed this session (drives the new-offer diff).
 // newKeys: Set of offer keys that appeared *after* first load (rows get highlighted).
 // recent: Map of group -> timestamp of its latest new offer (groups float to the top).
+// newWindowMs: how long an offer with a firstSeenAt stamp counts as new (default 24h).
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
@@ -61,18 +62,31 @@
       if (!merged.length) { empty.push(g); continue; }
       totalOffers += merged.length;
 
-      // Diff against the session's seen set: offers appearing after first load
-      // get remembered in newKeys (row highlight) and bump the group in recent
+      // New-offer detection. Cloud data.json stamps each offer with firstSeenAt
+      // (diffed across snapshots by CardTrader listing id in fetch-cardtrader.js);
+      // that stamp is authoritative and reload-proof: anything first seen within
+      // newWindowMs is highlighted even on first load. Offers without the stamp
+      // (local watcher, data.json predating the field) fall back to the session
+      // diff against the seen set: offers appearing after first load get
+      // remembered in newKeys. Either way a new offer bumps its group in recent
       // (sorts it to the top below).
+      const windowMs = opts.newWindowMs || 24 * 60 * 60 * 1000;
       let newCount = 0;
       for (const o of merged) {
-        const key = g + "#" + o._variant + "#" + o._site + "#" + o.seller + "#" + o.price;
-        o._new = opts.newKeys ? opts.newKeys.has(key) : false;
-        if (opts.seen && !opts.seen.has(key)) {
-          opts.seen.add(key);
-          if (!opts.firstRun) {
-            if (opts.newKeys) { opts.newKeys.add(key); o._new = true; }
-            if (opts.recent) opts.recent.set(g, Date.now());
+        if (o.firstSeenAt) {
+          const ts = Date.parse(o.firstSeenAt);
+          o._new = isFinite(ts) && Date.now() - ts < windowMs;
+          if (o._new && opts.recent && ts > (opts.recent.get(g) || 0)) opts.recent.set(g, ts);
+        } else {
+          const key = o.id != null ? o._site + "#id#" + o.id
+            : g + "#" + o._variant + "#" + o._site + "#" + o.seller + "#" + o.price;
+          o._new = opts.newKeys ? opts.newKeys.has(key) : false;
+          if (opts.seen && !opts.seen.has(key)) {
+            opts.seen.add(key);
+            if (!opts.firstRun) {
+              if (opts.newKeys) { opts.newKeys.add(key); o._new = true; }
+              if (opts.recent) opts.recent.set(g, Date.now());
+            }
           }
         }
         if (o._new) newCount++;

@@ -15,10 +15,6 @@ const CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, "config.json"), "utf8"
 const OUT = path.join(__dirname, "web", "data.json");
 
 const TOKEN = process.env.CARDTRADER_TOKEN;
-if (!TOKEN) {
-  console.error("CARDTRADER_TOKEN env var is required (CardTrader API bearer token)");
-  process.exit(1);
-}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const WAIT_MS = 250; // pace between cards
@@ -61,6 +57,10 @@ async function fetchCard(product, rates) {
     const rawCur = (o.price_currency || "EUR").toUpperCase();
     const eur = rawCur === "EUR" ? rawAmt : toEur(rawAmt, rawCur, rates);
     offers.push({
+      // CardTrader marketplace listing id — unique and stable for the lifetime
+      // of the listing. Drives the new-offer diff (firstSeenAt below, and the
+      // seen-key in shared/render.js).
+      id: o.id ?? null,
       price: eur != null ? eur : rawAmt,
       priceStr: eur != null ? eur.toFixed(2) + " €" : rawAmt != null ? rawAmt.toFixed(2) + " " + rawCur : null,
       foil: !!ph.mtg_foil,
@@ -75,7 +75,54 @@ async function fetchCard(product, rates) {
   return { ...product, productUrl: cardUrl(product), offers };
 }
 
-(async () => {
+// Stamps offers with firstSeenAt by diffing listing ids against the previous
+// snapshot: a listing already in `prev` keeps its old stamp, an unseen one gets
+// `nowIso`. No-op when `prev` has no listing ids (first run after this feature
+// deployed, or the previous snapshot couldn't be fetched) — otherwise every
+// existing listing would light up as "new" at once. A listing that vanishes for
+// one snapshot (its card errored that run) gets re-stamped when it returns;
+// data.json is the only state we keep, so that drift is accepted.
+function applyFirstSeen(results, prev, nowIso) {
+  const prevSeen = new Map(); // listing id -> firstSeenAt (null if unstamped)
+  for (const r of (prev && prev.results) || []) {
+    for (const o of r.offers || []) {
+      if (o.id != null) prevSeen.set(String(o.id), o.firstSeenAt || null);
+    }
+  }
+  if (!prevSeen.size) return;
+  for (const r of results) {
+    for (const o of r.offers || []) {
+      if (o.id == null) continue;
+      if (prevSeen.has(String(o.id))) {
+        const t = prevSeen.get(String(o.id));
+        if (t) o.firstSeenAt = t;
+      } else {
+        o.firstSeenAt = nowIso;
+      }
+    }
+  }
+}
+
+// Previous snapshot, straight off the data branch. The unique query param
+// busts Fastly's max-age=300 cache so we diff against the latest commit.
+async function getPreviousData() {
+  const repo = process.env.GITHUB_REPOSITORY || "PaludaNCode/MTG-Pricerunner";
+  const url = `https://raw.githubusercontent.com/${repo}/data/data.json?t=${Date.now()}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (e) {
+    console.error("previous data.json unavailable (" + e.message + ") — skipping firstSeenAt stamping this run");
+    return null;
+  }
+}
+
+async function main() {
+  if (!TOKEN) {
+    console.error("CARDTRADER_TOKEN env var is required (CardTrader API bearer token)");
+    process.exit(1);
+  }
   const products = normalizeCards(CONFIG).filter((p) => p.site === "cardtrader");
   const rates = await getRates();
   const results = [];
@@ -91,7 +138,12 @@ async function fetchCard(product, rates) {
     console.error("all cards errored — not writing data.json so the last good data survives");
     process.exit(1);
   }
+  const updatedAt = new Date().toISOString();
+  applyFirstSeen(results, await getPreviousData(), updatedAt);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), results }, null, 0));
+  fs.writeFileSync(OUT, JSON.stringify({ updatedAt, results }, null, 0));
   console.log("wrote " + OUT);
-})();
+}
+
+module.exports = { applyFirstSeen };
+if (require.main === module) main();
