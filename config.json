@@ -36,6 +36,10 @@
     { "url": "https://www.cardtrader.com/en/cards/393436-hex-magic-marvel-super-heroes", "group": "Hex Magic", "variant": "Marvel Super Heroes", "code": "MSH" },
     { "url": "https://www.cardtrader.com/en/cards/393383-shuri-wakandan-inventor-marvel-super-heroes", "group": "Shuri, Wakandan Inventor", "variant": "Marvel Super Heroes", "code": "MSH" },
     { "url": "https://www.cardtrader.com/cards/396357-shuri-wakandan-inventor-marvel-super-heroes-promos", "group": "Shuri, Wakandan Inventor", "variant": "Promos", "code": "PMSH" },
+    { "url": "https://www.cardtrader.com/en/cards/288830-guide-of-souls-modern-horizons-3", "group": "Guide of Souls", "variant": "Modern Horizons 3", "code": "MH3" },
+    { "url": "https://www.cardtrader.com/en/cards/288831-guide-of-souls-extended-art-modern-horizons-3-collectors", "group": "Guide of Souls", "variant": "Extended Art Collectors", "code": "MH3" },
+    { "url": "https://www.cardtrader.com/en/cards/290402-guide-of-souls-modern-horizons-3-prerelease", "group": "Guide of Souls", "variant": "Prerelease", "code": "PMH3" },
+    { "url": "https://www.cardtrader.com/cards/371505-guide-of-souls-store-championship-store-championships", "group": "Guide of Souls", "variant": "Store Championship", "code": "SCH" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven/Flow-State?language=7", "group": "Flow State", "variant": "Strixhaven", "code": "SOS" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven-Mystical-Archive/Stock-Up-V1?language=7", "group": "Stock Up", "variant": "Mystical Archive V1", "code": "SOA" },
