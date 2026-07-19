@@ -3,8 +3,12 @@
 // seen: Set of every offer key observed this session (drives the new-offer diff).
 // newKeys: Set of offer keys that appeared *after* first load (rows get highlighted).
 // recent: Map of group -> timestamp of its latest new offer (groups float to the top).
+// Groups with more than MAX_VISIBLE_ROWS offers collapse the rest behind a
+// "Show more" toggle; expandedGroups keeps the choice across refetch re-renders.
 // Expects #grid and #watching elements in the page.
 (function (global) {
+  const MAX_VISIBLE_ROWS = 10;
+  const expandedGroups = new Set();
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
   const SRC = { cardtrader: "CT", cardmarket: "CM" };
   const condAbbr = (c) => (c ? COND_MAP[c.toUpperCase()] || c : "");
@@ -86,14 +90,22 @@
     cards.sort((a, b) => rank(b.g) - rank(a.g));
 
     for (const { g, merged, newCount } of cards) {
-      const rows = merged.map((o) =>
-        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
+      const collapsible = merged.length > MAX_VISIBLE_ROWS;
+      const rows = merged.map((o, i) =>
+        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}${collapsible && i >= MAX_VISIBLE_ROWS ? " extra" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
       ).join("");
+      const toggle = collapsible
+        ? `<tr class="toggle-row"><td colspan="${cols.length}"><button type="button" class="toggle-rows"><span class="when-collapsed">Show ${merged.length - MAX_VISIBLE_ROWS} more ▾</span><span class="when-expanded">Show less ▴</span></button></td></tr>`
+        : "";
 
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "card" + (collapsible && !expandedGroups.has(g) ? " is-collapsed" : "");
       card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges">${newCount ? `<span class="badge badge-new">+${newCount} new</span>` : ""}<span class="badge">${merged.length}</span></span></h2>
-        <table>${colgroup}${head}${rows}</table>`;
+        <table>${colgroup}${head}${rows}${toggle}</table>`;
+      if (collapsible) card.querySelector(".toggle-rows").addEventListener("click", () => {
+        if (expandedGroups.has(g)) expandedGroups.delete(g); else expandedGroups.add(g);
+        card.classList.toggle("is-collapsed", !expandedGroups.has(g));
+      });
       grid.appendChild(card);
     }
 
