@@ -46,6 +46,19 @@ test("every card entry has an official set code (shown on phones)", () => {
   }
 });
 
+test("fetch lands close the grid: ZEN fetches directly before the ONS fetches", () => {
+  const cfg = JSON.parse(raw);
+  // Grid order = first appearance of each group in cards[] (render.js);
+  // add new cards ABOVE the fetch lands so these keep ending the grid.
+  const groups = [];
+  for (const c of cfg.cards) if (!groups.includes(c.group)) groups.push(c.group);
+  assert.deepEqual(
+    groups.slice(-5),
+    ["Arid Mesa", "Verdant Catacombs", "Windswept Heath", "Wooded Foothills", "Bloodstained Mire"],
+    "fetch lands must stay the last five groups (ZEN pair, then ONS trio)",
+  );
+});
+
 test("no duplicate cardmarket entries (same url)", () => {
   const cfg = JSON.parse(raw);
   const urls = normalizeCards(cfg)
