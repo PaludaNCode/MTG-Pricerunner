@@ -22,8 +22,6 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
   background: linear-gradient(90deg, rgba(139,124,255,.18), transparent); border-bottom: 1px solid var(--line); }
 .badge { font-size: .8rem; font-weight: 700; padding: .15rem .6rem; border-radius: 999px; background: var(--accent); color: #0b0b12; }
 .badges { display: inline-flex; gap: .35rem; align-items: center; }
-.badge-new { background: var(--accent2); }
-tr.is-new td { background: rgba(54, 214, 195, .08); }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout: fixed; }
 col.c-price { width: 22%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
 col.c-ship { width: 10%; } col.c-src { width: 8%; } col.c-set { width: 23%; }
