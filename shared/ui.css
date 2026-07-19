@@ -33,6 +33,13 @@ td a { color: var(--accent2); text-decoration: none; }
 .set-code { display: none; } /* phones swap this in for .set-full (480px block) */
 .foil { color: #f5c542; font-weight: 700; font-size: .68rem; }
 .yes { color: #2ecc40; } .no { color: #ff5b52; } .unk { color: var(--muted); }
+/* Cards with many offers collapse the tail: render.js marks rows past the
+   cutoff .extra-row and appends a .more-toggle row that flips .collapsed.
+   Hiding whole rows is safe under table-layout: fixed — only hiding cells
+   shifts columns (see the 480px block). */
+.card.collapsed tr.extra-row { display: none; }
+tr.more-toggle td { color: var(--muted); font-size: .78rem; text-align: center; cursor: pointer; user-select: none; }
+tr.more-toggle td:hover { color: var(--accent2); }
 tr.p-green  td:first-child { box-shadow: inset 3px 0 0 #2ecc40; }
 tr.p-yellow td:first-child { box-shadow: inset 3px 0 0 #f5c542; }
 tr.p-orange td:first-child { box-shadow: inset 3px 0 0 #ff851b; }
