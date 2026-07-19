@@ -11,7 +11,16 @@
       "offers": [
         { "price": 4.11, "priceStr": "4.11 €", "foil": false, "condition": "Near Mint", "qty": 7, "seller": "ShortName", "shipsToMe": true },
         { "price": 28.4, "priceStr": "28.40 €", "foil": true, "condition": "Excellent", "qty": 1, "seller": "AVeryLongSellerName123", "shipsToMe": false },
-        { "price": 10046.64, "priceStr": "10046.64 €", "foil": true, "condition": "Mint", "qty": 2, "seller": "Zio_Peppino", "shipsToMe": null }
+        { "price": 10046.64, "priceStr": "10046.64 €", "foil": true, "condition": "Mint", "qty": 2, "seller": "Zio_Peppino", "shipsToMe": null },
+        { "price": 5.2, "priceStr": "5.20 €", "foil": false, "condition": "Near Mint", "qty": 3, "seller": "Seller04", "shipsToMe": true },
+        { "price": 5.9, "priceStr": "5.90 €", "foil": false, "condition": "Excellent", "qty": 1, "seller": "Seller05", "shipsToMe": false },
+        { "price": 6.5, "priceStr": "6.50 €", "foil": false, "condition": "Good", "qty": 2, "seller": "Seller06", "shipsToMe": true },
+        { "price": 7.1, "priceStr": "7.10 €", "foil": true, "condition": "Near Mint", "qty": 1, "seller": "Seller07", "shipsToMe": null },
+        { "price": 8.25, "priceStr": "8.25 €", "foil": false, "condition": "Played", "qty": 4, "seller": "Seller08", "shipsToMe": true },
+        { "price": 9.0, "priceStr": "9.00 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller09", "shipsToMe": false },
+        { "price": 11.4, "priceStr": "11.40 €", "foil": false, "condition": "Excellent", "qty": 2, "seller": "Seller10", "shipsToMe": true },
+        { "price": 13.75, "priceStr": "13.75 €", "foil": true, "condition": "Mint", "qty": 1, "seller": "Seller11", "shipsToMe": null },
+        { "price": 15.6, "priceStr": "15.60 €", "foil": false, "condition": "Light Played", "qty": 5, "seller": "Seller12", "shipsToMe": true }
       ]
     },
     {
