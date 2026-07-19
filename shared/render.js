@@ -6,6 +6,10 @@
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
+  // Cards with more than MAX_ROWS offers collapse the tail behind a toggle.
+  // Expanded groups are remembered here so the state survives the poll re-render.
+  const MAX_ROWS = 10;
+  const expandedGroups = new Set();
   const SRC = { cardtrader: "CT", cardmarket: "CM" };
   const condAbbr = (c) => (c ? COND_MAP[c.toUpperCase()] || c : "");
   const priceClass = (p) => (p == null ? "" : p < 5 ? "p-green" : p < 10 ? "p-yellow" : p < 15 ? "p-orange" : "p-red");
@@ -86,14 +90,24 @@
     cards.sort((a, b) => rank(b.g) - rank(a.g));
 
     for (const { g, merged, newCount } of cards) {
-      const rows = merged.map((o) =>
-        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
+      const rows = merged.map((o, i) =>
+        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}${i >= MAX_ROWS ? " row-extra" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
       ).join("");
 
+      const hidden = merged.length - MAX_ROWS;
+      const isOpen = expandedGroups.has(g);
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "card" + (isOpen ? " expanded" : "");
       card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges">${newCount ? `<span class="badge badge-new">+${newCount} new</span>` : ""}<span class="badge">${merged.length}</span></span></h2>
-        <table>${colgroup}${head}${rows}</table>`;
+        <table>${colgroup}${head}${rows}</table>${hidden > 0 ? `<button type="button" class="more-toggle">${isOpen ? "Show less" : `Show ${hidden} more`}</button>` : ""}`;
+      if (hidden > 0) {
+        card.querySelector(".more-toggle").addEventListener("click", (e) => {
+          const open = !expandedGroups.has(g);
+          if (open) expandedGroups.add(g); else expandedGroups.delete(g);
+          card.classList.toggle("expanded", open);
+          e.target.textContent = open ? "Show less" : `Show ${hidden} more`;
+        });
+      }
       grid.appendChild(card);
     }
 

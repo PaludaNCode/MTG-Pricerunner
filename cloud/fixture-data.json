@@ -26,6 +26,29 @@
     },
     {
       "site": "cardtrader",
+      "group": "Deep Stack",
+      "variant": "Onslaught",
+      "code": "ONS",
+      "name": "Deep Stack — Onslaught",
+      "productUrl": "https://example.com/5",
+      "offers": [
+        { "price": 1.01, "priceStr": "1.01 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller01", "shipsToMe": true },
+        { "price": 2.02, "priceStr": "2.02 €", "foil": false, "condition": "Near Mint", "qty": 2, "seller": "Seller02", "shipsToMe": true },
+        { "price": 3.03, "priceStr": "3.03 €", "foil": false, "condition": "Excellent", "qty": 1, "seller": "Seller03", "shipsToMe": false },
+        { "price": 4.04, "priceStr": "4.04 €", "foil": false, "condition": "Good", "qty": 3, "seller": "Seller04", "shipsToMe": true },
+        { "price": 5.05, "priceStr": "5.05 €", "foil": true, "condition": "Near Mint", "qty": 1, "seller": "Seller05", "shipsToMe": null },
+        { "price": 6.06, "priceStr": "6.06 €", "foil": false, "condition": "Played", "qty": 4, "seller": "Seller06", "shipsToMe": true },
+        { "price": 7.07, "priceStr": "7.07 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller07", "shipsToMe": false },
+        { "price": 8.08, "priceStr": "8.08 €", "foil": false, "condition": "Excellent", "qty": 2, "seller": "Seller08", "shipsToMe": true },
+        { "price": 9.09, "priceStr": "9.09 €", "foil": false, "condition": "Mint", "qty": 1, "seller": "Seller09", "shipsToMe": true },
+        { "price": 10.1, "priceStr": "10.10 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller10", "shipsToMe": true },
+        { "price": 11.11, "priceStr": "11.11 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller11", "shipsToMe": false },
+        { "price": 12.12, "priceStr": "12.12 €", "foil": true, "condition": "Excellent", "qty": 1, "seller": "Seller12", "shipsToMe": true },
+        { "price": 13.13, "priceStr": "13.13 €", "foil": false, "condition": "Poor", "qty": 5, "seller": "Seller13", "shipsToMe": true }
+      ]
+    },
+    {
+      "site": "cardtrader",
       "group": "Empty Watch",
       "variant": "Promos",
       "name": "Empty Watch — Promos",

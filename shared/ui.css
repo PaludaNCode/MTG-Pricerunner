@@ -33,6 +33,15 @@ td a { color: var(--accent2); text-decoration: none; }
 .set-code { display: none; } /* phones swap this in for .set-full (480px block) */
 .foil { color: #f5c542; font-weight: 700; font-size: .68rem; }
 .yes { color: #2ecc40; } .no { color: #ff5b52; } .unk { color: var(--muted); }
+/* Rows past the first 10 collapse behind the .more-toggle button (render.js).
+   Hiding whole rows is safe under table-layout: fixed — only hiding cells
+   within a row shifts columns. */
+.card tr.row-extra { display: none; }
+.card.expanded tr.row-extra { display: table-row; }
+.more-toggle { display: block; width: 100%; padding: .45rem .8rem; background: var(--card2); color: var(--muted);
+  border: none; border-top: 1px solid var(--line); font: inherit; font-size: .78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .4px; cursor: pointer; }
+.more-toggle:hover { color: var(--txt); }
 tr.p-green  td:first-child { box-shadow: inset 3px 0 0 #2ecc40; }
 tr.p-yellow td:first-child { box-shadow: inset 3px 0 0 #f5c542; }
 tr.p-orange td:first-child { box-shadow: inset 3px 0 0 #ff851b; }
