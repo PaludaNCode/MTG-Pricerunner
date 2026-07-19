@@ -1,8 +1,5 @@
 // Shared dashboard renderer for both the local watcher and the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc, seen, firstRun, newKeys, recent }) -> { totalOffers }
-// seen: Set of every offer key observed this session (drives the new-offer diff).
-// newKeys: Set of offer keys that appeared *after* first load (rows get highlighted).
-// recent: Map of group -> timestamp of its latest new offer (groups float to the top).
+// Usage: CardUI.renderGrid(data, { showShips, showSrc }) -> { totalOffers }
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
@@ -12,7 +9,7 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
   // Cards cap at this many offer rows; the rest collapse behind a toggle.
   // Expanded groups are remembered so the poll re-render doesn't snap them shut.
-  const MAX_VISIBLE_ROWS = 10;
+  const MAX_VISIBLE_ROWS = 8;
   const expandedGroups = new Set();
 
   function shipCell(o) {
@@ -65,43 +62,21 @@
       merged.sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
       if (!merged.length) { empty.push(g); continue; }
       totalOffers += merged.length;
-
-      // Diff against the session's seen set: offers appearing after first load
-      // get remembered in newKeys (row highlight) and bump the group in recent
-      // (sorts it to the top below).
-      let newCount = 0;
-      for (const o of merged) {
-        const key = g + "#" + o._variant + "#" + o._site + "#" + o.seller + "#" + o.price;
-        o._new = opts.newKeys ? opts.newKeys.has(key) : false;
-        if (opts.seen && !opts.seen.has(key)) {
-          opts.seen.add(key);
-          if (!opts.firstRun) {
-            if (opts.newKeys) { opts.newKeys.add(key); o._new = true; }
-            if (opts.recent) opts.recent.set(g, Date.now());
-          }
-        }
-        if (o._new) newCount++;
-      }
-      cards.push({ g, merged, newCount });
+      cards.push({ g, merged });
     }
 
-    // Groups that gained offers this session float to the top, most recent
-    // first; ties (and everything else) keep the config.json order.
-    const rank = (g) => (opts.recent && opts.recent.get(g)) || 0;
-    cards.sort((a, b) => rank(b.g) - rank(a.g));
-
-    for (const { g, merged, newCount } of cards) {
+    for (const { g, merged } of cards) {
       const hiddenCount = merged.length - MAX_VISIBLE_ROWS;
       const collapsible = hiddenCount > 0;
       const collapsed = collapsible && !expandedGroups.has(g);
       const rows = merged.map((o, i) =>
-        `<tr class="${priceClass(o.price)}${o._new ? " is-new" : ""}${collapsible && i >= MAX_VISIBLE_ROWS ? " row-extra" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
+        `<tr class="${priceClass(o.price)}${collapsible && i >= MAX_VISIBLE_ROWS ? " row-extra" : ""}">` + cols.map((c) => `<td class="c-${c.key}">${c.cell(o)}</td>`).join("") + "</tr>"
       ).join("");
       const toggle = collapsible ? `<tr class="row-toggle"><td colspan="${cols.length}"><button type="button">${collapsed ? `Show ${hiddenCount} more ▾` : "Show fewer ▴"}</button></td></tr>` : "";
 
       const card = document.createElement("div");
       card.className = "card" + (collapsed ? " is-collapsed" : "");
-      card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges">${newCount ? `<span class="badge badge-new">+${newCount} new</span>` : ""}<span class="badge">${merged.length}</span></span></h2>
+      card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges"><span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}${toggle}</table>`;
       if (collapsible) {
         const btn = card.querySelector(".row-toggle button");
