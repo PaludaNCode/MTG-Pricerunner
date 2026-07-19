@@ -38,6 +38,14 @@ tr.p-yellow td:first-child { box-shadow: inset 3px 0 0 #f5c542; }
 tr.p-orange td:first-child { box-shadow: inset 3px 0 0 #ff851b; }
 tr.p-red    td:first-child { box-shadow: inset 3px 0 0 #ff4136; }
 
+/* Cards cap at 10 offer rows; render.js tags the overflow rows .row-extra and
+   appends a .row-toggle row to expand/collapse them. Hiding whole rows is safe
+   under table-layout: fixed (only hiding *cells* shifts columns). */
+.card.is-collapsed tr.row-extra { display: none; }
+tr.row-toggle td { padding: 0; }
+tr.row-toggle button { width: 100%; padding: .45rem .8rem; background: none; border: 0; color: var(--muted); font: inherit; font-size: .78rem; cursor: pointer; }
+tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
+
 /* Sits above the grid so out-of-stock cards are seen first; collapse when
    every watched card has offers so the grid doesn't get a phantom gap. */
 .watching { margin-bottom: 1.2rem; }
