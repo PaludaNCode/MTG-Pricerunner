@@ -51,7 +51,17 @@ jobs:
       # ~12h, which pinned the site on stale snapshots — worse than raw for this update cadence.
       # Scheduled workflows are auto-disabled after 60 days without repo activity;
       # re-enabling on every run resets that clock deterministically.
+      # GitHub's API 503s in short bursts, so ride those out with a few retries
+      # instead of failing the run after the data has already been published.
       - name: Keepalive
-        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-data.yml/enable"
+        run: |
+          for delay in 2 4 8; do
+            if gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-data.yml/enable"; then
+              exit 0
+            fi
+            echo "keepalive attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-data.yml/enable"
         env:
           GH_TOKEN: ${{ github.token }}
