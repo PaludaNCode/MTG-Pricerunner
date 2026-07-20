@@ -257,6 +257,11 @@ const server = http.createServer(async (req, res) => {
     res.end(fs.readFileSync(path.join(__dirname, "index.html")));
     return;
   }
+  if (url === "/favicon.svg") {
+    res.writeHead(200, { "Content-Type": "image/svg+xml" });
+    res.end(fs.readFileSync(path.join(SHARED_DIR, "favicon.svg")));
+    return;
+  }
   if (url === "/ui.css") {
     res.writeHead(200, { "Content-Type": "text/css; charset=utf-8" });
     res.end(fs.readFileSync(path.join(SHARED_DIR, "ui.css")));

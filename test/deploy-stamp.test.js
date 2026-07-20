@@ -14,7 +14,7 @@ const ROOT = path.join(__dirname, "..");
 const wf = fs.readFileSync(path.join(ROOT, ".github", "workflows", "update.yml"), "utf8");
 const hasBash = spawnSync("bash", ["-c", "true"]).status === 0;
 
-test("deploy cache-bust stamps all three asset links and nothing else", { skip: !hasBash && "bash unavailable" }, () => {
+test("deploy cache-bust stamps all four asset links and nothing else", { skip: !hasBash && "bash unavailable" }, () => {
   const cmds = wf.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("sed -i") || l.startsWith("grep -c"));
   assert.equal(cmds.length, 2, "expected the sed line and its grep guard in update.yml");
 
@@ -25,8 +25,8 @@ test("deploy cache-bust stamps all three asset links and nothing else", { skip: 
   execFileSync("bash", ["-ec", cmds.join("\n")], { cwd: tmp, env: { ...process.env, GITHUB_SHA: "cafef00d" } });
 
   const out = fs.readFileSync(path.join(tmp, "cloud", "web", "index.html"), "utf8");
-  assert.equal((out.match(/\?v=cafef00d/g) || []).length, 3, "exactly the three asset links must be stamped");
-  for (const link of ['href="ui.css?v=cafef00d"', 'src="render.js?v=cafef00d"', 'src="app.js?v=cafef00d"']) {
+  assert.equal((out.match(/\?v=cafef00d/g) || []).length, 4, "exactly the four asset links must be stamped");
+  for (const link of ['href="ui.css?v=cafef00d"', 'href="favicon.svg?v=cafef00d"', 'src="render.js?v=cafef00d"', 'src="app.js?v=cafef00d"']) {
     assert.ok(out.includes(link), `missing stamped link: ${link}`);
   }
   assert.ok(out.includes("data/data.json"), "the data.json URL must not be stamped");
