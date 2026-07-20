@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fanned cards — variant comparison</title>
+<style>
+  body { font-family: system-ui, "Segoe UI", sans-serif; background: #0e1016; color: #e7e9ee; margin: 0; padding: 24px; }
+  h1 { font-size: 1.05rem; margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; max-width: 1200px; }
+  .proto { background: #171a23; border: 1px solid #2a2f3d; border-radius: 12px; padding: 12px; }
+  .proto h2 { font-size: .76rem; font-weight: 600; margin: 0 0 8px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 7px; border-radius: 8px; margin-bottom: 5px; }
+  .row.dark { background: #202124; }
+  .row.light { background: #dee1e6; }
+  img { display: block; }
+  .s64 { width: 64px; height: 64px; }
+  .s32 { width: 32px; height: 32px; }
+  .s16 { width: 16px; height: 16px; }
+  canvas.mag { width: 128px; height: 128px; image-rendering: pixelated; display: block; background: #202124; border-radius: 8px; padding: 6px; }
+  .maglabel { font-size: .68rem; color: #8b91a3; margin-top: 4px; }
+</style>
+</head>
+<body>
+<h1>Fanned cards — original vs. reworked variants</h1>
+<div class="grid" id="grid"></div>
+<script>
+  const icons = [
+    ["../icon-02-fanned-cards.svg", "Original (committed)"],
+    ["variant-a-staircase-clean.svg", "A — staircase, cleaned"],
+    ["variant-b-hand.svg", "B — symmetric hand"],
+    ["variant-c-hand-sparkle.svg", "C — hand + sparkle"],
+    ["variant-d-hand-whiteface.svg", "D — hand, white face"],
+  ];
+  document.getElementById("grid").innerHTML = icons.map(([file, name], i) => `
+    <div class="proto">
+      <h2>${name}</h2>
+      <div class="row dark">
+        <img class="s64" src="${file}"><img class="s32" src="${file}"><img class="s16" src="${file}">
+      </div>
+      <div class="row light">
+        <img class="s64" src="${file}"><img class="s32" src="${file}"><img class="s16" src="${file}">
+      </div>
+      <canvas class="mag" id="mag${i}" width="16" height="16"></canvas>
+      <div class="maglabel">true 16 px, magnified 8×</div>
+    </div>`).join("");
+  icons.forEach(([file], i) => {
+    const img = new Image();
+    img.onload = () => document.getElementById("mag" + i).getContext("2d").drawImage(img, 0, 0, 16, 16);
+    img.src = file;
+  });
+</script>
+</body>
+</html>
