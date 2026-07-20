@@ -4,6 +4,7 @@ cloud/web/data.json
 cloud/web/ui.css
 cloud/web/render.js
 cloud/web/app.js
+cloud/web/favicon.svg
 cloud/shot-*.png
 .cf-profile/
 chrome-debug/

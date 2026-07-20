@@ -9,9 +9,9 @@ const { chromium } = require("playwright");
 
 const WEB = path.join(__dirname, "web");
 const SHARED = path.join(__dirname, "..", "shared");
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml" };
 
-for (const f of ["ui.css", "render.js", "app.js"]) {
+for (const f of ["ui.css", "render.js", "app.js", "favicon.svg"]) {
   fs.copyFileSync(path.join(SHARED, f), path.join(WEB, f));
 }
 if (!fs.existsSync(path.join(WEB, "data.json"))) {
