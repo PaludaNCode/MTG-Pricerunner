@@ -5,7 +5,7 @@
 // Why the official API: the public website JSON (/en/cards/<id>.json) only returns
 // offers shippable to the requester's IP country, so US-based GitHub runners silently
 // miss most JP sellers. The authenticated API is not geo-filtered and returns the
-// whole list in one request (no pagination). Cardmarket is ignored here.
+// whole list in one request (no pagination).
 const fs = require("fs");
 const path = require("path");
 const { normalizeCards } = require("../shared/cards");

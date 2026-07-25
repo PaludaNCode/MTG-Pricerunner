@@ -1,23 +1,17 @@
 # MTG Pricerunner
 
-Watches Magic: The Gathering card prices (Japanese printings) on CardTrader and Cardmarket.
+Watches Magic: The Gathering card prices (Japanese printings) on CardTrader.
 
 **Live site:** https://paludancode.github.io/MTG-Pricerunner/
 
-Two flavors, one identical UI — only the price import differs:
-
-| | Local watcher | Cloud site |
-|---|---|---|
-| Sources | CardTrader API + Cardmarket (scraped via your own Chrome over CDP) | CardTrader API only |
-| Refresh | rolling, one card every 5 s | every ~2 min via an external pinger (see below) |
-| Run | `local\start-watcher.cmd` → http://localhost:8787 | nothing — GitHub Pages |
+A GitHub Actions fetcher builds `data.json` from the CardTrader API and a static
+GitHub Pages site renders it — nothing to run or host yourself.
 
 ## Layout
 
 ```
-config.json          card watch list + watcher settings (shared by both)
-shared/              one UI for both dashboards: ui.css, render.js, app.js
-local/               Node watcher server + launcher scripts (Windows)
+config.json          card watch list (paste-a-URL entries)
+shared/              UI for the dashboard: ui.css, render.js, app.js
 cloud/               GitHub Actions fetcher + static site (cloud/web)
   fetch-cardtrader.js  builds data.json from the CardTrader API
   verify-mobile.js     UI smoke test (renders at 320/390/1440 px, fails on overflow)
@@ -33,7 +27,7 @@ docs/                external-pinger.md — the cron-job.org pinger behind the ~
 The deploy workflow copies `shared/` into the site at build time; `cloud/web/` build
 artifacts (`data.json`, copied UI files) are gitignored.
 
-## How cloud data updates work
+## How data updates work
 
 Site deploys and data refreshes are decoupled:
 
@@ -90,7 +84,6 @@ overflow or an empty grid. Uses live `cloud/web/data.json` when present, else th
 
 ## Adding a card
 
-Add an entry to `cards` in `config.json` (CardTrader or Cardmarket URL + `group` + `variant`
+Add an entry to `cards` in `config.json` (CardTrader URL + `group` + `variant`
 \+ `code`, the official Scryfall set code shown on phones — CI fails if it's missing),
-and merge to `main` via PR. That push triggers an immediate data refresh; the local
-watcher reloads config on the fly.
+and merge to `main` via PR. That push triggers an immediate data refresh.

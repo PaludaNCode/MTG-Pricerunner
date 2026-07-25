@@ -6,8 +6,6 @@ cloud/web/render.js
 cloud/web/app.js
 cloud/web/favicon.svg
 cloud/shot-*.png
-.cf-profile/
-chrome-debug/
 _*.json
 _*.html
 *.log

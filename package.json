@@ -2,10 +2,8 @@
   "name": "pricerunner",
   "version": "1.0.0",
   "description": "",
-  "main": "local/server.js",
   "scripts": {
-    "test": "node --test",
-    "start": "node local/server.js"
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

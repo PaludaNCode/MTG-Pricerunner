@@ -1,9 +1,8 @@
-// Shared dashboard renderer for both the local watcher and the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc }) -> { totalOffers }
+// Dashboard renderer for the cloud static site.
+// Usage: CardUI.renderGrid(data, { showShips }) -> { totalOffers }
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
-  const SRC = { cardtrader: "CT", cardmarket: "CM" };
   const condAbbr = (c) => (c ? COND_MAP[c.toUpperCase()] || c : "");
   const priceClass = (p) => (p == null ? "" : p < 5 ? "p-green" : p < 10 ? "p-yellow" : p < 15 ? "p-orange" : "p-red");
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -25,7 +24,6 @@
       { key: "qty", label: "Qty", cell: (o) => (o.qty != null ? o.qty : "") },
     ];
     if (opts.showShips) cols.push({ key: "ship", label: opts.shipLabel || "Ship", cell: shipCell });
-    if (opts.showSrc) cols.push({ key: "src", label: "Src", cell: (o) => SRC[o._site] || o._site });
     cols.push({ key: "seller", label: "Seller", cell: (o) => esc(o.seller) });
     // Phones show the official set code (`code` in config.json) instead of the
     // full variant name; data.json entries predating the field fall back to it.

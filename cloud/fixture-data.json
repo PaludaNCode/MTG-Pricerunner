@@ -24,7 +24,7 @@
       ]
     },
     {
-      "site": "cardmarket",
+      "site": "cardtrader",
       "group": "Fixture Card",
       "variant": "Prerelease",
       "name": "Fixture Card — Prerelease",
@@ -42,7 +42,7 @@
       "offers": []
     },
     {
-      "site": "cardmarket",
+      "site": "cardtrader",
       "group": "Broken Watch",
       "variant": "Zendikar Rising",
       "name": "Broken Watch — Zendikar Rising",
