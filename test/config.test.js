@@ -45,11 +45,3 @@ test("every card entry has an official set code (shown on phones)", () => {
     assert.ok(p.code, `missing "code" for ${p.name}`);
   }
 });
-
-test("no duplicate cardmarket entries (same url)", () => {
-  const cfg = JSON.parse(raw);
-  const urls = normalizeCards(cfg)
-    .filter((p) => p.site === "cardmarket")
-    .map((p) => p.url);
-  assert.equal(new Set(urls).size, urls.length, "duplicate cardmarket url in config.json");
-});

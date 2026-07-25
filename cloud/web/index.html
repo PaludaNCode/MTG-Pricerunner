@@ -11,7 +11,6 @@
 <header>
   <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Japanese</span></h1>
   <span class="live"><span class="dot"></span>live</span>
-  <span id="fetching" class="meta"></span>
   <span class="spacer"></span>
   <span id="updated" class="meta">loading…</span>
 </header>
@@ -24,7 +23,7 @@
      We deliberately do NOT use jsDelivr here: it caches @branch refs for ~12h and its purge API
      is rate-limited, so purging every run gets throttled and the site sticks on a stale snapshot.
      On localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
-<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000, showSrc: false };</script>
+<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000 };</script>
 <script src="render.js"></script>
 <script src="app.js"></script>
 </body>
