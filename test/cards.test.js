@@ -15,10 +15,12 @@ test("parses blueprintId from a slugged CardTrader URL without /en/", () => {
   assert.equal(p.blueprintId, 384530);
 });
 
-test("drops Cardmarket URLs (unsupported since the local watcher was removed)", () => {
+test("Cardmarket URLs normalize to site=cardmarket with the URL as productUrl", () => {
   const url = "https://www.cardmarket.com/en/Magic/Products/Singles/Aetherdrift/Stock-Up?language=7";
-  const out = normalizeCards({ cards: [{ url, group: "Stock Up" }] });
-  assert.equal(out.length, 0);
+  const [p] = normalizeCards({ cards: [{ url, group: "Stock Up", variant: "Aetherdrift", code: "DFT" }] });
+  assert.equal(p.site, "cardmarket");
+  assert.equal(p.productUrl, url); // no blueprint indirection — the URL *is* the product
+  assert.equal(p.blueprintId, null);
 });
 
 test("language defaults to config.defaultLanguage and can be overridden per card", () => {

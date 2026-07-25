@@ -1,0 +1,97 @@
+name: Deploy to Azure
+
+# Manual trigger ONLY, deliberately.
+#
+# The Pages workflows deploy on push to main; this one does not. Azure costs money and
+# owns a second live site, so a merge must never silently deploy it — you press the
+# button. To make it automatic later, add:
+#   push:
+#     branches: [main]
+#     paths: ["cloud/**", "shared/**", "config.json", "azure/**"]
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to deploy"
+        type: choice
+        default: both
+        options: [both, site, function]
+      name_prefix:
+        description: "Resource name prefix used by azure/provision.ps1"
+        default: mtgpricerunner
+      resource_group:
+        default: rg-mtg-pricerunner
+
+permissions:
+  contents: read
+  id-token: write # federated (OIDC) login to Azure — no stored client secret
+
+concurrency:
+  group: azure-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      NAME_PREFIX: ${{ inputs.name_prefix }}
+      RESOURCE_GROUP: ${{ inputs.resource_group }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Requires an app registration federated to this repo, plus these repo secrets:
+      #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+      # See docs/azure-hosting.md.
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve storage account name
+        run: |
+          s=$(echo "$NAME_PREFIX" | tr -cd 'a-z0-9' | cut -c1-24)
+          echo "STORAGE=$s" >> "$GITHUB_ENV"
+
+      - name: Stage site
+        if: inputs.target != 'function'
+        run: |
+          cp shared/ui.css shared/render.js shared/app.js shared/favicon.svg cloud/web/
+          sed -i "s/\(href=\"ui\.css\|href=\"favicon\.svg\|src=\"render\.js\|src=\"app\.js\)\"/\1?v=${GITHUB_SHA}\"/g" cloud/web/index.html
+          grep -c "?v=${GITHUB_SHA}" cloud/web/index.html | grep -qx 4
+
+      # Assets carry ?v=<sha>, so they're immutable. index.html must stay uncached or a
+      # deploy would be invisible until the edge expired.
+      - name: Upload assets
+        if: inputs.target != 'function'
+        run: |
+          az storage blob upload-batch --account-name "$STORAGE" --auth-mode login \
+            --destination '$web' --source cloud/web --pattern '*' --overwrite \
+            --content-cache-control "public, max-age=31536000, immutable" \
+            --exclude-pattern 'index.html' --output none
+          az storage blob upload --account-name "$STORAGE" --auth-mode login \
+            --container-name '$web' --name index.html --file cloud/web/index.html --overwrite \
+            --content-cache-control "no-cache" --content-type "text/html; charset=utf-8" --output none
+
+      # Mirror the repo layout inside the function app so the relative requires in
+      # cloud/*.js resolve unchanged.
+      - name: Stage function app
+        if: inputs.target != 'site'
+        run: |
+          mkdir -p azure/functions/shared azure/functions/cloud
+          cp config.json azure/functions/config.json
+          cp shared/cards.js azure/functions/shared/cards.js
+          cp cloud/build-data.js cloud/cardtrader-core.js cloud/cardmarket-core.js azure/functions/cloud/
+
+      - name: Deploy function app
+        if: inputs.target != 'site'
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ inputs.name_prefix }}-fn
+          package: azure/functions
+          respect-funcignore: true
+
+      - name: Report site URL
+        run: |
+          az storage account show --name "$STORAGE" --resource-group "$RESOURCE_GROUP" \
+            --query "primaryEndpoints.web" --output tsv

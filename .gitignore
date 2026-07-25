@@ -9,3 +9,9 @@ cloud/shot-*.png
 _*.json
 _*.html
 *.log
+# Staged into the Azure function app at deploy time to mirror the repo layout
+# (so the relative requires in cloud/*.js resolve) — build artifacts, like cloud/web/.
+azure/functions/config.json
+azure/functions/shared/
+azure/functions/cloud/
+azure/functions/local.settings.json

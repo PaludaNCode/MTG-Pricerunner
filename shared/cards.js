@@ -1,13 +1,18 @@
 // Normalizes the easy "paste a URL" config into full product objects.
 // Config card shape: { url, group, variant, code?, language? }
 //   - code is the official (Scryfall) set code, shown instead of variant on phones
-//   - site is derived from the URL host (cardtrader.com)
+//   - site is derived from the URL host (cardtrader.com / cardmarket.com)
 //   - blueprintId is extracted from a CardTrader URL (/cards/<id>-...)
 //   - language defaults to config.defaultLanguage
 // Legacy explicit entries ({ site, blueprintId, ... } or { site, url, ... }) still work.
+//
+// Cardmarket entries normalize fine, but whether they can actually be *fetched* is a
+// separate question owned by cloud/cardmarket-core.js — its transport is "off" by
+// default, so a Cardmarket entry yields a paused row rather than offers.
 
 function siteFromUrl(u = "") {
   if (/cardtrader\.com/i.test(u)) return "cardtrader";
+  if (/cardmarket\.com/i.test(u)) return "cardmarket";
   return null;
 }
 function blueprintFromUrl(u = "") {

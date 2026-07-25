@@ -1,0 +1,13 @@
+{
+  "name": "pricerunner-azure-functions",
+  "version": "1.0.0",
+  "description": "Timer-triggered CardTrader data refresh that publishes $web/data.json",
+  "main": "src/functions/*.js",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@azure/functions": "^4.7.0",
+    "@azure/identity": "^4.5.0",
+    "@azure/storage-blob": "^12.26.0"
+  }
+}
