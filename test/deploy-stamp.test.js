@@ -25,8 +25,20 @@ test("deploy cache-bust stamps all four asset links and nothing else", { skip: !
   execFileSync("bash", ["-ec", cmds.join("\n")], { cwd: tmp, env: { ...process.env, GITHUB_SHA: "cafef00d" } });
 
   const out = fs.readFileSync(path.join(tmp, "cloud", "web", "index.html"), "utf8");
-  assert.equal((out.match(/\?v=cafef00d/g) || []).length, 4, "exactly the four asset links must be stamped");
-  for (const link of ['href="ui.css?v=cafef00d"', 'href="favicon.svg?v=cafef00d"', 'src="render.js?v=cafef00d"', 'src="app.js?v=cafef00d"']) {
+  const assets = [
+    'href="ui.css?v=cafef00d"',
+    'href="favicon.svg?v=cafef00d"',
+    'src="render.js?v=cafef00d"',
+    'src="cardmarket-parse.js?v=cafef00d"',
+    'src="cardmarket-client.js?v=cafef00d"',
+    'src="app.js?v=cafef00d"',
+  ];
+  assert.equal(
+    (out.match(/\?v=cafef00d/g) || []).length,
+    assets.length,
+    `exactly the ${assets.length} asset links must be stamped`
+  );
+  for (const link of assets) {
     assert.ok(out.includes(link), `missing stamped link: ${link}`);
   }
   assert.ok(out.includes("data/data.json"), "the data.json URL must not be stamped");

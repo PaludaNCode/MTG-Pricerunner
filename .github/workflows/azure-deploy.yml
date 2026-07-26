@@ -56,9 +56,9 @@ jobs:
       - name: Stage site
         if: inputs.target != 'function'
         run: |
-          cp shared/ui.css shared/render.js shared/app.js shared/favicon.svg cloud/web/
-          sed -i "s/\(href=\"ui\.css\|href=\"favicon\.svg\|src=\"render\.js\|src=\"app\.js\)\"/\1?v=${GITHUB_SHA}\"/g" cloud/web/index.html
-          grep -c "?v=${GITHUB_SHA}" cloud/web/index.html | grep -qx 4
+          cp shared/ui.css shared/render.js shared/app.js shared/favicon.svg shared/cardmarket-parse.js shared/cardmarket-client.js cloud/web/
+          sed -i "s/\(href=\"ui\.css\|href=\"favicon\.svg\|src=\"render\.js\|src=\"cardmarket-parse\.js\|src=\"cardmarket-client\.js\|src=\"app\.js\)\"/\1?v=${GITHUB_SHA}\"/g" cloud/web/index.html
+          grep -c "?v=${GITHUB_SHA}" cloud/web/index.html | grep -qx 6
 
       # Assets carry ?v=<sha>, so they're immutable. index.html must stay uncached or a
       # deploy would be invisible until the edge expired.
@@ -80,7 +80,7 @@ jobs:
         run: |
           mkdir -p azure/functions/shared azure/functions/cloud
           cp config.json azure/functions/config.json
-          cp shared/cards.js azure/functions/shared/cards.js
+          cp shared/cards.js shared/cardmarket-parse.js azure/functions/shared/
           cp cloud/build-data.js cloud/cardtrader-core.js cloud/cardmarket-core.js azure/functions/cloud/
 
       - name: Deploy function app

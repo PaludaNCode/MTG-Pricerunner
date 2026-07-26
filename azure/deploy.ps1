@@ -31,7 +31,7 @@ $doFunc = -not $SiteOnly
 if ($doSite) {
   Write-Host "==> Staging site into cloud/web"
   $web = Join-Path $repo "cloud/web"
-  foreach ($f in "ui.css", "render.js", "app.js", "favicon.svg") {
+  foreach ($f in "ui.css", "render.js", "app.js", "favicon.svg", "cardmarket-parse.js", "cardmarket-client.js") {
     Copy-Item (Join-Path $repo "shared/$f") (Join-Path $web $f) -Force
   }
 
@@ -41,9 +41,10 @@ if ($doSite) {
   $sha = (git -C $repo rev-parse HEAD).Trim()
   $index = Join-Path $web "index.html"
   $html = Get-Content $index -Raw
-  $html = [regex]::Replace($html, '(href="ui\.css|href="favicon\.svg|src="render\.js|src="app\.js)"', "`$1?v=$sha`"")
+  $assetPattern = '(href="ui\.css|href="favicon\.svg|src="render\.js|src="cardmarket-parse\.js|src="cardmarket-client\.js|src="app\.js)"'
+  $html = [regex]::Replace($html, $assetPattern, "`$1?v=$sha`"")
   $stamped = ([regex]::Matches($html, [regex]::Escape("?v=$sha"))).Count
-  if ($stamped -ne 4) { throw "expected to stamp 4 asset links, stamped $stamped" }
+  if ($stamped -ne 6) { throw "expected to stamp 6 asset links, stamped $stamped" }
   Set-Content -Path $index -Value $html -Encoding utf8 -NoNewline
 
   # Assets are content-addressed by the ?v=<sha> query string, so they can be cached
@@ -74,7 +75,9 @@ if ($doFunc) {
   New-Item -ItemType Directory -Force -Path (Join-Path $fn "shared") | Out-Null
   New-Item -ItemType Directory -Force -Path (Join-Path $fn "cloud") | Out-Null
   Copy-Item (Join-Path $repo "config.json")   (Join-Path $fn "config.json") -Force
-  Copy-Item (Join-Path $repo "shared/cards.js") (Join-Path $fn "shared/cards.js") -Force
+  foreach ($f in "cards.js", "cardmarket-parse.js") {
+    Copy-Item (Join-Path $repo "shared/$f") (Join-Path $fn "shared/$f") -Force
+  }
   foreach ($f in "build-data.js", "cardtrader-core.js", "cardmarket-core.js") {
     Copy-Item (Join-Path $repo "cloud/$f") (Join-Path $fn "cloud/$f") -Force
   }

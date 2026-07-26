@@ -5,6 +5,8 @@ cloud/web/ui.css
 cloud/web/render.js
 cloud/web/app.js
 cloud/web/favicon.svg
+cloud/web/cardmarket-parse.js
+cloud/web/cardmarket-client.js
 cloud/shot-*.png
 _*.json
 _*.html

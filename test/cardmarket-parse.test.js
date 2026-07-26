@@ -1,6 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { parseCardmarket, resolveTransport } = require("../cloud/cardmarket-core");
+// The parser is required from shared/ (its single source of truth, loaded by the browser
+// too), the transport resolution from the Node-only core.
+const { parseCardmarket, looksChallenged, looksLoggedOut } = require("../shared/cardmarket-parse");
+const { resolveTransport } = require("../cloud/cardmarket-core");
 
 // Minimal HTML matching the shapes the parser's regexes target.
 const row = (id, body) => `<div id="articleRow${id}" class="article-row">${body}</div>`;
@@ -57,6 +60,24 @@ test("logged-out page yields shipsToMe = null (unknown)", () => {
 test("rows without price or seller are skipped, empty html yields no offers", () => {
   assert.equal(parseCardmarket(row(1, "<span>nothing useful</span>")).length, 0);
   assert.equal(parseCardmarket("").length, 0);
+});
+
+// The client shows a "pass the challenge once" prompt based on this, and must never
+// report a Cloudflare interstitial as "this card has no offers".
+test("a Cloudflare challenge is distinguished from a real page", () => {
+  assert.equal(looksChallenged("<title>Just a moment...</title>"), true);
+  assert.equal(looksChallenged("<h1>Attention Required! | Cloudflare</h1>"), true);
+  assert.equal(looksChallenged("Verify you are human"), true);
+  assert.equal(looksChallenged(LOGGED_IN_PAGE), false);
+  assert.equal(looksChallenged(""), false);
+  // Only the head of the document is inspected, so the phrase appearing in ordinary page
+  // content far down (e.g. a seller comment) must not be mistaken for a challenge.
+  assert.equal(looksChallenged("x".repeat(5000) + "Just a moment"), false);
+});
+
+test("logged-out pages are detectable (shipsToMe is unknowable then)", () => {
+  assert.equal(looksLoggedOut(LOGGED_OUT_PAGE), true);
+  assert.equal(looksLoggedOut(LOGGED_IN_PAGE), false);
 });
 
 // The transport is the part that's actually broken, so pin its resolution: the default

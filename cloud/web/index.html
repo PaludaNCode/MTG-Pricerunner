@@ -25,6 +25,11 @@
      On localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
 <script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000 };</script>
 <script src="render.js"></script>
+<!-- Cardmarket is fetched client-side through the browser extension in extension/, because
+     no server can get past its Cloudflare protection (docs/cardmarket-extension.md).
+     Both scripts are inert without the extension installed. -->
+<script src="cardmarket-parse.js"></script>
+<script src="cardmarket-client.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -19,6 +19,10 @@ function inConfigOrder(products, bySite) {
 
 // Throws when every card errored, so callers abort before publishing and the last
 // good data.json survives. A partially-failed refresh still publishes.
+//
+// Cardmarket rows are emitted as paused placeholders (the transport is "off" and no
+// server can get past Cloudflare); the browser fills them in client-side via the
+// extension. See docs/cardmarket-extension.md.
 async function buildData({ config, token, log = () => {} }) {
   if (!token) throw new Error("CardTrader API token is required");
 
@@ -29,6 +33,7 @@ async function buildData({ config, token, log = () => {} }) {
   // Skip the FX lookup entirely when there's no CardTrader work — nothing else needs it.
   const rates = cardtrader.length ? await getRates() : { EUR: 1 };
   const ctResults = await fetchCardtraderAll(cardtrader, { token, rates, log });
+
   const cmResults = await fetchCardmarketAll(cardmarket, { config, log });
 
   const results = inConfigOrder(products, { cardtrader: ctResults, cardmarket: cmResults });
