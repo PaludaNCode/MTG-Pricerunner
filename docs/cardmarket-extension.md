@@ -39,20 +39,73 @@ The trade-off: prices are only fetched while the dashboard is open in that brows
 price watcher that's the moment you actually care, so it costs nothing real — but a phone
 without the extension shows the Cardmarket rows as paused.
 
-## Install (Chrome / Edge, ~1 minute)
+## Try it now — step by step
 
-1. Open `chrome://extensions`.
+Do these in order. Steps 1–3 are one-time; after that it's just step 4.
+
+**1. Serve the dashboard locally.** In the repo:
+
+```bash
+node scripts/try-extension.js --serve
+```
+
+It prints a URL (`http://localhost:8788/`) and keeps running. It builds the page exactly
+as the deploy does and writes a `data.json` containing just the Cardmarket cards from
+`config.json`, so no CardTrader token is needed.
+
+**2. Install the extension** (once — it survives restarts):
+
+1. Open `chrome://extensions` **in your normal, everyday Chrome**.
 2. Turn on **Developer mode** (top right).
 3. Click **Load unpacked** and select this repo's `extension/` folder.
-4. Open the dashboard. The header shows `Cardmarket live` once rows fill in.
 
-It's a permanent install — it survives restarts. Chrome may nag about developer-mode
-extensions on startup; that's expected for an unpacked extension and harmless.
+Chrome may nag about developer-mode extensions at startup; that's expected for an unpacked
+extension and harmless.
 
-If a row says **"Cloudflare challenge — open Cardmarket in a tab and pass it once"**, do
-exactly that: visit cardmarket.com in the same browser, clear the challenge, reload the
-dashboard. Being logged in also makes the Ship column meaningful (whether a seller ships
-to your country); logged out, prices still parse but Ship is unknown.
+**3. Make sure Cardmarket is happy in that Chrome.** Visit
+[cardmarket.com](https://www.cardmarket.com/) in the same browser. If it shows a "Verify
+you are human" check, clear it. Logging in is optional but makes the Ship column
+meaningful (whether a seller actually ships to your country); logged out, prices still
+parse but Ship is unknown.
+
+**4. Open `http://localhost:8788/` in that Chrome.**
+
+Expected: the header ends with `Cardmarket live`, and the Cardmarket rows fill in over
+~10 seconds (they're fetched 2s apart, deliberately).
+
+### If it doesn't work
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Header says `Cardmarket needs the browser extension` | The content script didn't load | Confirm the extension is enabled in `chrome://extensions`, then hard-reload the page |
+| Rows say `Cloudflare challenge — …` | That Chrome has no clearance yet | Do step 3 in the **same** browser, then reload |
+| Rows say `no offers found on the page` | Either genuinely no Japanese listings, or Cardmarket changed its markup | Open the card's URL by hand; if offers are visible there, the parser needs updating |
+| Ship column empty | Not logged in | Log in to Cardmarket in that browser |
+
+## Don't try to test this with Playwright
+
+**Measured 2026-07-26: a Playwright-driven browser cannot pass, and the reason is
+inherent.** Cloudflare serves an automated (CDP-driven) browser a *non-interactive*
+managed challenge that never completes — the page sits on "Performing security
+verification" with **zero buttons or checkboxes**, so there is nothing a human can click to
+clear it. Warming the profile by hand doesn't help, because there's no widget to interact
+with. Automating the browser is precisely what Cloudflare detects, which makes a driven
+browser the one browser this design can't use.
+
+Two further traps found while testing:
+
+- **Chrome 137+ removed the `--load-extension` switch** on the stable channel. Verified:
+  `channel: "chrome"` loads no extension at all (`serviceWorkers().length === 0`), while
+  Playwright's bundled Chromium loads it fine (`=== 1`). So a "just launch real Chrome with
+  the extension" harness silently tests nothing.
+- Clearance earned in one browser **does not** transfer to another — Cloudflare binds it to
+  the IP, TLS fingerprint and User-Agent that earned it. Warming your own Chrome does
+  nothing for a Playwright profile.
+
+`node scripts/try-extension.js` (no `--serve`) still drives the extension via Playwright.
+It's kept only to re-verify the above and to prove the plumbing works: it reports
+`service worker: loaded` and `bridge: connected`, then correctly diagnoses the challenge
+rather than claiming the cards have no offers. Use `--serve` for anything real.
 
 ## What the extension can and cannot do
 
