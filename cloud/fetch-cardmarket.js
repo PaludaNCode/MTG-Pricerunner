@@ -97,10 +97,28 @@ function learnCost(previous, spent, scrapes) {
   return previous * 0.7 + observed * 0.3;
 }
 
-// Stalest first, never-fetched before everything: this is what makes a budget smaller
-// than the number of due cards rotate fairly instead of starving the tail of the list.
-const staleness = (prevResult) =>
-  prevResult && prevResult.fetchedAt ? Date.parse(prevResult.fetchedAt) || 0 : 0;
+// Queue order: least-recently-*attempted* first, never-attempted before everything.
+//
+// Ordering on fetchedAt alone would be a trap. A card whose URL is wrong never gets a
+// fetchedAt, so it would sort to the front on every single run, spend a credit failing,
+// and starve every working card behind it — forever. Counting the failed attempt is what
+// sends it to the back of the rotation instead.
+const lastAttempt = (prev) => {
+  if (!prev) return 0;
+  const ok = prev.fetchedAt ? Date.parse(prev.fetchedAt) : 0;
+  const tried = prev.triedAt ? Date.parse(prev.triedAt) : 0;
+  return Math.max(ok || 0, tried || 0);
+};
+
+// …and after a few consecutive failures, stop paying to rediscover the same 404 every
+// rotation. One retry a day is enough to pick a fixed URL back up.
+const FAILURES_BEFORE_BACKOFF = 3;
+const FAILURE_BACKOFF_MS = 24 * 3600 * 1000;
+function inFailureBackoff(prev, now) {
+  if (!prev || (prev.failures || 0) < FAILURES_BEFORE_BACKOFF || !prev.triedAt) return false;
+  const since = now - Date.parse(prev.triedAt);
+  return Number.isFinite(since) && since >= 0 && since < FAILURE_BACKOFF_MS;
+}
 
 // Raised when the account is out of credits or the key is bad: retrying the remaining
 // cards would fail identically, so the caller stops the whole Cardmarket pass.
@@ -208,8 +226,11 @@ async function fetchAll(products, opts = {}) {
 
   // Everything past its TTL, stalest first.
   const due = products
-    .filter((p) => !isFresh(prevByUrl.get(p.productUrl), ttlMinutes, now))
-    .sort((a, b) => staleness(prevByUrl.get(a.productUrl)) - staleness(prevByUrl.get(b.productUrl)));
+    .filter((p) => {
+      const prevResult = prevByUrl.get(p.productUrl);
+      return !isFresh(prevResult, ttlMinutes, now) && !inFailureBackoff(prevResult, now);
+    })
+    .sort((a, b) => lastAttempt(prevByUrl.get(a.productUrl)) - lastAttempt(prevByUrl.get(b.productUrl)));
 
   // How many of them this run may actually pay for.
   let allowance = Math.max(0, perRunLimit);
@@ -265,12 +286,12 @@ async function fetchAll(products, opts = {}) {
       // Due, but out of allowance. Not an error — keep the old prices and let a later
       // run pick it up; it sorts to the front of the queue as the stalest card.
       log(`${tag} … deferred (budget)`);
-      results.push(carryForward(p, prevResult, null));
+      results.push(carryForward(p, prevResult, null, now));
       continue;
     }
     if (fatal) {
       // Out of credits: keep whatever we had rather than blanking the card.
-      results.push(carryForward(p, prevResult, fatal));
+      results.push(carryForward(p, prevResult, fatal, now));
       continue;
     }
 
@@ -286,7 +307,7 @@ async function fetchAll(products, opts = {}) {
       scraped++; // a failed scrape can still cost a credit; count it so the log stays honest
       log("failed: " + e.message);
       if (e instanceof FirecrawlFatal) fatal = e.message;
-      results.push(carryForward(p, prevResult, e.message));
+      results.push(carryForward(p, prevResult, e.message, now));
     }
     if (i < products.length - 1) await sleep(paceMs);
   }
@@ -330,21 +351,29 @@ async function fetchAll(products, opts = {}) {
 
 // Keep the last known offers (and their original fetchedAt, so the next run retries
 // instead of treating the failure as a fresh scrape). `error` is null for a card that
-// was merely deferred — that is a budget decision, not a fault.
-function carryForward(product, prevResult, error) {
+// was merely deferred — that is a budget decision, not a fault, so it records no attempt.
+// A real failure does record one, which is what moves the card down the queue.
+function carryForward(product, prevResult, error, now) {
   const out = {
     ...product,
     productUrl: product.productUrl,
     offers: prevResult ? prevResult.offers || [] : [],
     fetchedAt: prevResult ? prevResult.fetchedAt || null : null,
   };
-  if (error) out.error = error;
+  if (prevResult && prevResult.triedAt) out.triedAt = prevResult.triedAt;
+  if (error) {
+    out.error = error;
+    out.triedAt = new Date(now).toISOString();
+    out.failures = (prevResult && prevResult.failures ? prevResult.failures : 0) + 1;
+  }
   return out;
 }
 
 module.exports = {
   fetchAll,
   isFresh,
+  lastAttempt,
+  inFailureBackoff,
   budgetLeft,
   utcDay,
   getCredits,

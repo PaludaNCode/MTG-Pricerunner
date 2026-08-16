@@ -10,6 +10,8 @@ const {
   dailyCreditAllowance,
   learnCost,
   creditsUsedToday,
+  lastAttempt,
+  inFailureBackoff,
 } = require("../cloud/fetch-cardmarket");
 
 const NOW = Date.parse("2026-08-16T12:00:00.000Z");
@@ -91,4 +93,37 @@ test("credits spent today reset with the UTC day", () => {
   assert.equal(creditsUsedToday({ day: "2026-08-16", credits: 12 }, NOW), 12);
   assert.equal(creditsUsedToday({ day: "2026-08-15", credits: 12 }, NOW), 0);
   assert.equal(creditsUsedToday(null, NOW), 0);
+});
+
+test("queue order counts failed attempts, so a broken URL can't starve the rotation", () => {
+  const hoursAgo = (h) => new Date(NOW - h * 3600 * 1000).toISOString();
+
+  // A card that has never succeeded but was just tried must NOT sort ahead of a card
+  // last fetched 30 hours ago — otherwise a 404 eats the budget on every run forever.
+  const brokenUrl = { fetchedAt: null, triedAt: hoursAgo(1), failures: 2 };
+  const staleButWorking = { fetchedAt: hoursAgo(30) };
+  assert.ok(
+    lastAttempt(brokenUrl) > lastAttempt(staleButWorking),
+    "the just-failed card must sort behind the genuinely stale one",
+  );
+
+  // A never-touched card still goes first.
+  assert.equal(lastAttempt(undefined), 0);
+  assert.equal(lastAttempt({}), 0);
+  // A success after an earlier failure is what counts.
+  assert.equal(lastAttempt({ fetchedAt: hoursAgo(1), triedAt: hoursAgo(9) }), Date.parse(hoursAgo(1)));
+});
+
+test("a card that keeps failing backs off to one retry a day", () => {
+  const minsAgo = (m) => new Date(NOW - m * 60000).toISOString();
+
+  assert.equal(inFailureBackoff({ failures: 2, triedAt: minsAgo(5) }, NOW), false, "under the threshold, keep trying");
+  assert.equal(inFailureBackoff({ failures: 3, triedAt: minsAgo(5) }, NOW), true, "three strikes -> hold off");
+  assert.equal(
+    inFailureBackoff({ failures: 9, triedAt: minsAgo(60 * 25) }, NOW),
+    false,
+    "after a day, try once more in case the URL was fixed",
+  );
+  assert.equal(inFailureBackoff(null, NOW), false);
+  assert.equal(inFailureBackoff({ failures: 5 }, NOW), false, "no attempt timestamp -> no backoff");
 });
