@@ -18,15 +18,32 @@
 // both the set name and a per-offer URL. On a single-product page there is no such
 // link — the row IS the product — so `variant`/`productUrl` come back null and the
 // caller falls back to the config entry's own set. That keeps both shapes working.
-const ROW_PRODUCT_LINK = /href="(\/[a-z]{2}\/Magic\/Products\/Singles\/([^/"]+)\/[^"?#]+)"/;
+// Two ways a row can name its printing, tried in order. The first also yields a
+// per-offer link. Absolute and relative hrefs, and either quote style, because the
+// first version of this only matched one shape and silently found nothing on the
+// live page — every offer came back with no set at all.
+const ROW_PRODUCT_LINK =
+  /href=["'](?:https?:\/\/(?:www\.)?cardmarket\.com)?(\/[a-z]{2}\/Magic\/Products\/Singles\/([^/"']+)\/[^"'?#]+)(?=["'?#])/i;
+
+// Fallback: the expansion rendered as a symbol rather than a link. Only tags that
+// actually mention "expansion" are considered, so a "Foil" or seller tooltip can't be
+// mistaken for a set name.
+function expansionFromIcon(block) {
+  const tags = block.match(/<[^>]+>/g) || [];
+  for (const tag of tags) {
+    if (!/expansion/i.test(tag)) continue;
+    const label = tag.match(/(?:aria-label|data-bs-original-title|data-original-title|title)=["']([^"']+)["']/i);
+    if (label && label[1].trim()) return label[1].trim();
+  }
+  return null;
+}
 // Cardmarket prefixes some Universes Beyond expansions with the whole brand, e.g.
 // "Magic-The-Gathering-Marvel-Super-Heroes". Left alone that fills the Set column with
 // six words of boilerplate and pushes the actual set name out of view.
-const unslug = (s) =>
-  decodeURIComponent(s)
-    .replace(/-/g, " ")
-    .replace(/^Magic:?\s+The\s+Gathering\s+/i, "")
-    .trim();
+// Consumes any separator after the brand too: the slug form gives "Magic The Gathering
+// Marvel Super Heroes" but a tooltip can read "Magic: The Gathering - Marvel Super Heroes".
+const stripBrand = (s) => String(s).replace(/^Magic:?\s+The\s+Gathering\b[\s:—–-]*/i, "").trim();
+const unslug = (s) => stripBrand(decodeURIComponent(s).replace(/-/g, " "));
 
 // Normalized offer shape (same contract as the CardTrader fetcher):
 // { price:Number|null, priceStr, foil:Bool|null, condition, qty, seller,
@@ -57,6 +74,7 @@ function parseCardmarket(html) {
     else shipsToMe = true;
     // Which printing this row is for — only present on the all-versions page.
     const prodMatch = block.match(ROW_PRODUCT_LINK);
+    const iconSet = prodMatch ? null : expansionFromIcon(block);
     if (price !== null || sellerMatch) {
       offers.push({
         price,
@@ -69,7 +87,7 @@ function parseCardmarket(html) {
         language: null, // not reliably exposed by the guest HTML; the ?language= URL filters instead
         shipsToMe,
         // null on a single-product page; the caller then uses the config entry's set.
-        variant: prodMatch ? unslug(prodMatch[2]) : null,
+        variant: prodMatch ? unslug(prodMatch[2]) : iconSet ? stripBrand(iconSet) : null,
         productUrl: prodMatch ? "https://www.cardmarket.com" + prodMatch[1] : null,
       });
     }

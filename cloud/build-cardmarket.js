@@ -165,14 +165,12 @@ function readPrev() {
         fs.writeFileSync(f, html);
         console.log("  dumped " + f);
       }
-      // First article row of the first all-versions page scraped: enough to see how a
-      // row identifies its printing, small enough to sit in the published JSON.
-      if (debugSample && !sample && p.allVersions) {
+      // Stash the first all-versions row seen. Whether it gets published is decided
+      // after parsing: if no offer came back with a printing, the extraction is wrong
+      // and this row is the only way to find out how the page actually names it.
+      if (!sample && p.allVersions) {
         const i = html.indexOf('id="articleRow');
-        if (i !== -1) {
-          sample = { url: p.productUrl, row: html.slice(i - 400 < 0 ? 0 : i - 400, i + 2600) };
-          console.log(`  captured a ${sample.row.length}-char sample row from ${p.group}`);
-        }
+        if (i !== -1) sample = { url: p.productUrl, group: p.group, row: html.slice(Math.max(0, i - 400), i + 2600) };
       }
     },
   });
@@ -185,7 +183,26 @@ function readPrev() {
 
   const results = mergeResults(products, out.results, prev.results);
   const kept = results.length - out.results.length;
+
+  // Self-diagnosing: an all-versions page whose offers carry no printing means the row
+  // extraction missed. Publishing one raw row makes that fixable from the data itself,
+  // rather than needing someone to remember to re-run with a debug flag.
+  const allVersionsScraped = out.results.filter((r) => r.allVersions && (r.offers || []).length);
+  const anySet = allVersionsScraped.some((r) => r.offers.some((o) => o.variant));
+  const extractionBroken = allVersionsScraped.length > 0 && !anySet;
+  if (extractionBroken) {
+    console.log(
+      `WARNING: ${allVersionsScraped.length} all-versions card(s) returned offers but no printings — ` +
+        "the row extraction matched nothing. Publishing a sample row in meta.debug.",
+    );
+  } else if (allVersionsScraped.length) {
+    const n = allVersionsScraped.reduce((a, r) => a + r.offers.filter((o) => o.variant).length, 0);
+    const t = allVersionsScraped.reduce((a, r) => a + r.offers.length, 0);
+    console.log(`per-offer printings resolved on ${n} of ${t} all-versions offer(s)`);
+  }
+  const publishSample = sample && (debugSample || extractionBroken);
+  if (publishSample) console.log(`  sample row from ${sample.group} (${sample.row.length} chars)`);
   if (kept > 0) console.log(`carried ${kept} untouched card(s) forward from the previous snapshot`);
 
-  write(sample ? { ...out.meta, debug: sample } : out.meta, results);
+  write(publishSample ? { ...out.meta, debug: sample } : out.meta, results);
 })();
