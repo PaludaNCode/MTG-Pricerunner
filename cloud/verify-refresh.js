@@ -95,6 +95,28 @@ function check(ok, msg) {
   check(sent && sent.body.inputs.cards === "", "no ticks = empty card list = the normal rotation");
   check(sent && sent.headers.authorization === "Bearer test-token-123", "authorises with the token from localStorage");
   check((await page.locator("#cm-refresh").textContent()).includes("scraping"), "button reports progress while the run is in flight");
+
+  console.log("each card says when it was last scraped");
+  check(
+    (await page.locator("#grid .card .age").count()) === 3,
+    "an age chip on every Cardmarket card, and none on the CardTrader-only one",
+  );
+  check(
+    (await page.locator("#grid .card", { hasText: "Seeker of Skybreak" }).locator(".age").count()) === 0,
+    "Seeker of Skybreak has nothing to scrape, so it shows no age",
+  );
+  check(
+    (await page.locator("#grid .card .age").first().getAttribute("title")).includes("last scraped"),
+    "the chip's tooltip gives the exact timestamp",
+  );
+  check(
+    (await page.locator("#legend").textContent()).includes("oldest card first"),
+    "the legend explains the refresh model",
+  );
+  check(
+    (await page.locator("#updated").textContent()).includes("credits today"),
+    "the header reports today's credit spend, not the file's age",
+  );
   await page.close();
 
   console.log("ticking cards narrows the refresh to those cards");
@@ -120,6 +142,10 @@ function check(ok, msg) {
   check(
     picked && picked.inputs.cards === "Runehorn Hellkite,Stock Up",
     "only the ticked cards are sent, by name: " + (picked && picked.inputs.cards),
+  );
+  check(
+    (await page.locator("#grid .card .age.pending").count()) === 2,
+    "the two ticked cards show a spinner while the run is in flight",
   );
   // Same page, not a new one: browser.newPage() gets a fresh context, so a reload is
   // the only way to prove the picks came back from localStorage rather than memory.

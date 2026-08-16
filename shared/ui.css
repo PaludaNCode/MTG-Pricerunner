@@ -43,6 +43,18 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
 /* The title takes the slack so it stays left-aligned: with a tick box added, h2 has
    three children and space-between would centre the name. */
 .card h2 > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* How long ago this card's Cardmarket data was scraped. Muted by default — with a
+   metered budget a multi-day age is normal, not an alarm — and only coloured when
+   something actually needs attention. */
+.age { font-size: .68rem; font-weight: 600; letter-spacing: .3px; padding: .15rem .45rem; border-radius: 999px;
+  background: var(--card2); color: var(--muted); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.age.new { color: var(--accent2); border-color: rgba(54,214,195,.35); }
+.age.err { color: #ff5b52; border-color: rgba(255,91,82,.4); }
+.age.pending { color: var(--accent); border-color: rgba(139,124,255,.5); animation: pulse 1.2s infinite; }
+/* One-line explanation of the refresh model, above the grid. */
+.legend { color: var(--muted); font-size: .78rem; line-height: 1.5; margin: 0 0 .8rem; }
+.legend .label { color: var(--txt); font-weight: 600; }
+.legend b { color: var(--txt); font-weight: 600; }
 .badges { display: inline-flex; gap: .35rem; align-items: center; }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout: fixed; }
 col.c-price { width: 22%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }

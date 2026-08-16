@@ -11,6 +11,35 @@
   const condAbbr = (c) => (c ? COND_MAP[c.toUpperCase()] || c : "");
   const priceClass = (p) => (p == null ? "" : p < 5 ? "p-green" : p < 10 ? "p-yellow" : p < 15 ? "p-orange" : "p-red");
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+
+  // Compact age, e.g. 40m / 6h / 3d. Shared with app.js so the header and the per-card
+  // chips can never disagree about how old something is.
+  function ageLabel(iso) {
+    const ms = Date.now() - Date.parse(iso);
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return mins + "m";
+    const hours = Math.round(mins / 60);
+    return hours < 48 ? hours + "h" : Math.round(hours / 24) + "d";
+  }
+
+  // Cardmarket freshness for one card. Unlike CardTrader (refetched every couple of
+  // minutes, for free), a Cardmarket card is scraped only when the credit budget reaches
+  // it — which can be hours or days — so each card has to say when that last happened.
+  function cmChip(entries, pending) {
+    if (!entries.length) return "";
+    if (pending) return '<span class="age pending" title="Refresh running — this card is in the queue">···</span>';
+    const failed = entries.find((p) => p.error);
+    const fetchedAt = entries.map((p) => p.fetchedAt).filter(Boolean).sort().pop();
+    if (failed && !fetchedAt) {
+      return `<span class="age err" title="Cardmarket: ${esc(failed.error)}">!</span>`;
+    }
+    if (!fetchedAt) return '<span class="age new" title="Cardmarket: not scraped yet">new</span>';
+    const age = ageLabel(fetchedAt) || "?";
+    const when = new Date(fetchedAt).toLocaleString();
+    const suffix = failed ? ` — last attempt failed: ${failed.error}` : "";
+    return `<span class="age${failed ? " err" : ""}" title="Cardmarket last scraped ${esc(when)} (${age} ago)${esc(suffix)}">${age}</span>`;
+  }
   // Cards cap at this many offer rows; the rest collapse behind a toggle.
   // Expanded groups are remembered so the poll re-render doesn't snap them shut.
   const MAX_VISIBLE_ROWS = 8;
@@ -77,11 +106,13 @@
       totalOffers += merged.length;
       // Only a card with a Cardmarket entry can be refreshed on demand — CardTrader
       // is free and already refreshes everything every couple of minutes.
-      cards.push({ g, merged, refreshable: groups[g].some((p) => p.site === "cardmarket") });
+      const cmEntries = groups[g].filter((p) => p.site === "cardmarket");
+      cards.push({ g, merged, refreshable: cmEntries.length > 0, cmEntries });
     }
 
     const selected = opts.selected || new Set();
-    for (const { g, merged, refreshable } of cards) {
+    const pending = opts.pending || new Set();
+    for (const { g, merged, refreshable, cmEntries } of cards) {
       const hiddenCount = merged.length - MAX_VISIBLE_ROWS;
       const collapsible = hiddenCount > 0;
       const collapsed = collapsible && !expandedGroups.has(g);
@@ -99,7 +130,7 @@
 
       const card = document.createElement("div");
       card.className = "card" + (collapsed ? " is-collapsed" : "");
-      card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges"><span class="badge">${merged.length}</span></span></h2>
+      card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges">${cmChip(cmEntries, pending.has(g))}<span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}${toggle}</table>`;
       const box = card.querySelector(".pick");
       if (box && opts.onToggle) box.addEventListener("change", () => opts.onToggle(g, box.checked));
@@ -121,5 +152,5 @@
     return { totalOffers };
   }
 
-  global.CardUI = { renderGrid };
+  global.CardUI = { renderGrid, ageLabel };
 })(window);
