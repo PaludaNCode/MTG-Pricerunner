@@ -44,7 +44,13 @@
     intervalMs: 60000,
     // Target for the "↻ CM" button. force:true is sent as a workflow input so a manual
     // press ignores the TTL — the credit allowance still caps what it can spend.
-    dispatch: { repo: "PaludaNCode/MTG-Pricerunner", workflow: "update-cardmarket.yml", ref: "main" },
+    // dataBranch/dataFile let a signed-in refresh read the result straight from the
+    // branch. raw.githubusercontent caches for 5 minutes, so polling it after a run
+    // reports "timed out" while the data is already published.
+    dispatch: {
+      repo: "PaludaNCode/MTG-Pricerunner", workflow: "update-cardmarket.yml", ref: "main",
+      dataBranch: "data-cm", dataFile: "cardmarket.json",
+    },
   };
 })();</script>
 <script src="render.js"></script>

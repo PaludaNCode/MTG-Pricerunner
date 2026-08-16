@@ -62,11 +62,16 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
 .notice[hidden] { display: none; }
 .notice.err { border-color: rgba(255,91,82,.45); background: rgba(255,91,82,.08); }
 .notice b { color: var(--accent2); }
+.notice a { color: var(--accent2); }
+.notice .muted { color: var(--muted); }
 .notice code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .95em; color: var(--accent2); }
 .badges { display: inline-flex; gap: .35rem; align-items: center; }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout: fixed; }
-col.c-price { width: 22%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
-col.c-ship { width: 10%; } col.c-src { width: 9%; } col.c-set { width: 22%; }
+/* These sum to 100: with Seller gone no column is left to absorb a remainder, so any
+   change here has to be balanced against the others. Set takes the lion's share —
+   it holds the longest strings ("Extended Art Collectors") and is the link out. */
+col.c-price { width: 21%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
+col.c-ship { width: 9%; } col.c-src { width: 9%; } col.c-set { width: 42%; }
 /* Src holds a 2-letter tag (CT/CM); the default .8rem side padding eats enough of
    its column that the tag itself ellipsises, so give the text the room instead. */
 th.c-src, td.c-src { padding-left: .35rem; padding-right: .35rem; }
@@ -117,13 +122,12 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
   table { font-size: .82rem; }
   th, td { padding: .42rem .4rem .42rem .5rem; }
   th { font-size: .64rem; letter-spacing: .2px; }
-  /* phones: drop Src, show set codes instead of full set names — the freed
-     width keeps Qty visible and Price untruncated. The site is still reachable
-     per row: the Set cell links to that offer's product page.
-     Src cells stay in flow (width/padding 0, content clipped) — display:none
-     would shift later cells into the wrong columns under table-layout: fixed. */
-  col.c-src { width: 0; } th.c-src, td.c-src { padding: 0; }
-  col.c-price { width: 29%; } col.c-cond { width: 11%; } col.c-qty { width: 10%; }
-  col.c-ship { width: 11%; } col.c-set { width: 15%; }
+  /* phones: show set codes instead of full set names. Src stays — with two sources
+     merged into one price-sorted table, "is this CardTrader or Cardmarket?" is the
+     question you actually have on a phone, so it earns its ~27px. The width comes
+     out of Seller (the only flexing column) and a little off Ship and Set. */
+  col.c-price { width: 26%; } col.c-cond { width: 12%; } col.c-qty { width: 9%; }
+  col.c-ship { width: 9%; } col.c-src { width: 10%; } col.c-set { width: 34%; }
+  th.c-src, td.c-src { padding-left: .2rem; padding-right: .2rem; font-size: .72rem; }
   .set-full { display: none; } .set-code { display: inline; }
 }

@@ -18,6 +18,14 @@ on:
         description: "Comma-separated card names to scrape. Empty = every card, stalest first."
         type: string
         default: ""
+      debug:
+        description: "Publish one raw article row into meta.debug (for fixing the parser)"
+        type: boolean
+        default: false
+      balance_only:
+        description: "Just read the Firecrawl balance — scrapes nothing, costs nothing"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # force-push the data-cm branch
@@ -59,6 +67,8 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           CM_FORCE: ${{ inputs.force }}
           CM_CARDS: ${{ inputs.cards }}
+          CM_DEBUG: ${{ inputs.debug }}
+          CM_BALANCE_ONLY: ${{ inputs.balance_only }}
       # Same build-artifact pattern as the `data` branch: a single orphan commit,
       # force-pushed every run. Never branch from it or PR into it.
       - name: Publish cardmarket.json to the data-cm branch

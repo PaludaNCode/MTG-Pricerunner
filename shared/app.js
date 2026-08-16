@@ -15,7 +15,15 @@
     try {
       // Cardmarket must never take the page down with it: the branch may not exist yet,
       // and a failed scrape run is not a reason to hide CardTrader prices.
-      const [ct, cm] = await Promise.all([load(cfg.url), load(cfg.cmUrl).catch(() => null)]);
+      const [ct, raw] = await Promise.all([load(cfg.url), load(cfg.cmUrl).catch(() => null)]);
+      // A just-finished run is read straight from the branch, because the CDN copy can
+      // be up to 5 minutes stale. Prefer it until the CDN catches up, then drop it.
+      let cm = raw;
+      if (cmFresh) {
+        const rawAt = raw && raw.updatedAt ? Date.parse(raw.updatedAt) : 0;
+        if (Date.parse(cmFresh.updatedAt) > rawAt) cm = cmFresh;
+        else cmFresh = null;
+      }
 
       const data = {
         updatedAt: ct && ct.updatedAt,
@@ -74,7 +82,12 @@
       "The chip on each card shows how long ago that card was last scraped" +
       (affordable != null
         ? `, and today's budget still covers about <b>${affordable} card${affordable === 1 ? "" : "s"}</b>.`
-        : ". CardTrader keeps updating on its own, for free.");
+        : ". CardTrader keeps updating on its own, for free.") +
+      // Reading the balance is not billed, so this is genuinely free — worth offering,
+      // since otherwise the only way to refresh that figure is to spend credits.
+      (cfg.dispatch && getToken()
+        ? ' <a href="#" id="cm-balance">Check credit balance</a> <span class="muted">(free)</span>'
+        : "");
   }
 
   // ---- On-demand Cardmarket refresh ------------------------------------------------
@@ -111,6 +124,8 @@
   // Cards the in-flight run is scraping, so they can show a spinner rather than a
   // stale age while the workflow is running.
   let pending = new Set();
+  // A copy of cardmarket.json read through the API right after a run, ahead of the CDN.
+  let cmFresh = null;
 
   const getToken = () => (localStorage.getItem(TOKEN_KEY) || "").trim();
 
@@ -191,7 +206,7 @@
     );
   }
 
-  async function dispatch() {
+  async function dispatch(inputs) {
     const d = cfg.dispatch;
     const token = getToken();
     if (!token) {
@@ -207,12 +222,7 @@
           Accept: "application/vnd.github+json",
           "Content-Type": "application/json",
         },
-        // `cards` empty means "whatever is stalest"; a tick list narrows the run to
-        // exactly those, so a scarce allowance goes where it was asked to go.
-        body: JSON.stringify({
-          ref: d.ref || "main",
-          inputs: { force: "true", cards: [...picks].join(",") },
-        }),
+        body: JSON.stringify({ ref: d.ref || "main", inputs }),
       },
     );
     // 401/403 = the PAT is wrong or expired (they last a year). Drop it so the next
@@ -228,51 +238,208 @@
     if (res.status !== 204) throw new Error("dispatch failed: HTTP " + res.status);
   }
 
-  // The run takes ~30-60s, then publishes to the data-cm branch. Watch for the
-  // snapshot's timestamp to move rather than guessing at a fixed delay.
-  async function waitForNewData(before, deadline) {
+  // ---- Watching the actual workflow run --------------------------------------------
+  // Polling cardmarket.json alone can only ever say "nothing yet": a crashed run and a
+  // slow run look identical for three minutes, then both report a timeout. The token
+  // already has Actions read access, so ask GitHub what the run is really doing.
+  const gh = async (path) => {
+    const d = cfg.dispatch;
+    const res = await fetch(`https://api.github.com/repos/${d.repo}${path}`, {
+      headers: { Authorization: "Bearer " + getToken(), Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) throw new Error("GitHub API " + res.status);
+    return res.json();
+  };
+
+  // A dispatch returns 204 with no run id, so the run has to be found by time. Anything
+  // older than the moment we pressed is somebody else's run.
+  async function findRun(since, deadline) {
+    const d = cfg.dispatch;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 5000));
-      const cm = await load(cfg.cmUrl).catch(() => null);
-      if (cm && cm.updatedAt && cm.updatedAt !== before) return true;
+      try {
+        const j = await gh(`/actions/workflows/${d.workflow}/runs?event=workflow_dispatch&per_page=5`);
+        const run = (j.workflow_runs || []).find((r) => Date.parse(r.created_at) >= since - 15000);
+        if (run) return run;
+      } catch {
+        /* transient — keep looking */
+      }
+      await new Promise((r) => setTimeout(r, 3000));
     }
-    return false;
+    return null;
   }
 
-  async function onRefresh() {
+  const STEP_LABEL = {
+    "Set up job": "starting up",
+    "Pull the previous cardmarket.json (offers + credit ledger)": "loading the last snapshot",
+    "Scrape Cardmarket -> cloud/web/cardmarket.json": "scraping Cardmarket",
+    "Publish cardmarket.json to the data-cm branch": "publishing results",
+  };
+
+  // Follow the run to completion, reporting each step as it starts. Returns the run.
+  async function followRun(run, deadline, onStep) {
+    let lastLabel = null;
+    while (Date.now() < deadline) {
+      let jobs = null;
+      try {
+        jobs = await gh(`/actions/runs/${run.id}/jobs`);
+      } catch {
+        /* transient */
+      }
+      const job = jobs && jobs.jobs && jobs.jobs[0];
+      if (job) {
+        const running = (job.steps || []).find((st) => st.status === "in_progress");
+        const done = (job.steps || []).filter((st) => st.conclusion === "success").length;
+        const total = (job.steps || []).length || 1;
+        const label = running ? STEP_LABEL[running.name] || running.name : null;
+        if (label && label !== lastLabel) {
+          lastLabel = label;
+          onStep(label, done, total);
+        }
+        if (job.status === "completed") {
+          const failed = (job.steps || []).find((st) => st.conclusion === "failure");
+          return { conclusion: job.conclusion, failedStep: failed && failed.name, url: run.html_url };
+        }
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return { conclusion: "timed_out", url: run.html_url };
+  }
+
+  // Read the published file from the branch itself. The Contents API is authenticated
+  // and uncached, unlike raw.githubusercontent, whose 5-minute cache is why a finished
+  // run used to report "timed out" — the data was there, the CDN just hadn't caught up.
+  async function readPublished() {
+    const d = cfg.dispatch;
+    if (!d.dataBranch || !d.dataFile) return null;
+    const j = await gh(`/contents/${d.dataFile}?ref=${d.dataBranch}`);
+    const bytes = Uint8Array.from(atob(String(j.content || "").replace(/\s/g, "")), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)); // card names and € are not ASCII
+  }
+
+  async function waitForNewData(before, deadline) {
+    while (Date.now() < deadline) {
+      try {
+        const cm = await readPublished();
+        if (cm && cm.updatedAt && cm.updatedAt !== before) return cm;
+      } catch {
+        /* fall back to the CDN copy below */
+      }
+      const cdn = await load(cfg.cmUrl).catch(() => null);
+      if (cdn && cdn.updatedAt && cdn.updatedAt !== before) return cdn;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return null;
+  }
+
+  const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+
+  // Both buttons drive the same workflow and differ only in inputs and wording, so
+  // they share the run-following: dispatch, find the run, narrate its steps, read the
+  // result. `balance` scrapes nothing and costs nothing.
+  async function onRefresh(mode) {
     if (polling) return;
     polling = true;
+    const balance = mode === "balance";
     const before = window.__cmUpdatedAt || null;
+    const startedAt = Date.now();
+    const deadline = startedAt + 300000; // 5 min: a queued runner can sit a while
+    const wanted = picks.size ? plural(picks.size, "card") : "the stalest cards";
     try {
-      notice("");
-      setBtn("dispatching…", true);
-      await dispatch();
-      setBtn("scraping…", true, "Cardmarket scrape running");
-      // Mark the cards this run covers, then repaint so the page shows what is happening.
-      // Only ticked cards are knowable: with no ticks the fetcher chooses the stalest
-      // ones server-side, and guessing here would put a spinner on the wrong cards.
-      pending = new Set(picks);
+      notice(
+        balance
+          ? "<b>1/4</b> Asking GitHub to read the Firecrawl balance… <span class=\"muted\">(no scraping, no credits)</span>"
+          : `<b>1/4</b> Asking GitHub to start a scrape of ${wanted}…`,
+      );
+      setBtn(balance ? "↻ CM" : "dispatching…", true);
+      await dispatch(
+        balance
+          ? { force: "false", cards: "", balance_only: "true" }
+          : { force: "true", cards: [...picks].join(","), balance_only: "false" },
+      );
+
+      pending = balance ? new Set() : new Set(picks);
       await refresh();
-      setBtn("scraping…", true, "Cardmarket scrape running");
-      const ok = await waitForNewData(before, Date.now() + 180000);
+      setBtn("queued…", true);
+      notice(`<b>2/4</b> Request accepted. Waiting for a runner to pick it up…`);
+
+      const run = await findRun(startedAt, Math.min(deadline, Date.now() + 60000));
+      if (!run) {
+        throw new Error(
+          "GitHub accepted the request but no run appeared within a minute. " +
+            "Check the <a href=\"https://github.com/" + cfg.dispatch.repo + "/actions\" target=\"_blank\">Actions tab</a>.",
+        );
+      }
+
+      const link = `<a href="${run.html_url}" target="_blank">run #${run.run_number}</a>`;
+      if (!balance) setBtn("scraping…", true, "Cardmarket scrape running");
+      const result = await followRun(run, deadline, (label, done, total) => {
+        notice(`<b>3/4</b> ${link} is running — ${label} <span class="muted">(step ${done + 1} of ${total})</span>`);
+      });
+
+      if (result.conclusion !== "success") {
+        const why = result.conclusion === "timed_out"
+          ? "is still going after 5 minutes"
+          : `failed at <b>${result.failedStep || "an unknown step"}</b>`;
+        throw new Error(`The ${balance ? "balance check" : "scrape"} ${why}. Open ${link} for the log.`);
+      }
+
+      notice(`<b>4/4</b> ${balance ? "Balance read" : "Scrape finished"}. Fetching the result…`);
+      const cm = await waitForNewData(before, Date.now() + 90000);
+      cmFresh = cm; // show it now; the CDN may still be serving the old copy
       pending = new Set();
-      // Clear the flag first so the re-render's syncButton() can reflect the credits the
-      // run just spent, then let a timeout message override it.
       polling = false;
       await refresh();
-      if (!ok) setBtn("timed out", false, "no new snapshot within 3 min — check the Actions tab");
+
+      if (!cm) {
+        notice(
+          `${link} succeeded, but the new snapshot has not reached the CDN yet. ` +
+            "It should appear within a minute or two — the page keeps checking.",
+        );
+      } else if (balance) {
+        const m = cm.meta || {};
+        notice(
+          `<b>${m.remaining != null ? m.remaining : "?"} credits left</b> on the Firecrawl plan · ` +
+            `${m.credits || 0} spent today of an allowance of ${Math.round(m.allowance || 0)}` +
+            (m.costPerScrape ? ` · about ${m.costPerScrape} credit per card` : "") +
+            ". <span class=\"muted\">Nothing was scraped.</span>",
+        );
+      } else {
+        const m = cm.meta || {};
+        const scraped = cm.results.filter((r) => r.fetchedAt && Date.parse(r.fetchedAt) >= startedAt - 60000);
+        const offers = scraped.reduce((a, r) => a + (r.offers || []).length, 0);
+        const empty = scraped.filter((r) => !(r.offers || []).length).map((r) => r.group);
+        notice(
+          `<b>Done.</b> Refreshed ${plural(scraped.length, "card")} in ` +
+            `${Math.round((Date.now() - startedAt) / 1000)}s, ${plural(offers, "offer")} found` +
+            (m.credits != null ? ` · spent ${plural(m.credits, "credit")} today` : "") +
+            (m.remaining != null ? `, ${m.remaining} left on the plan` : "") +
+            (empty.length ? `<br><span class="muted">No Japanese listings right now: ${empty.join(", ")}</span>` : ""),
+        );
+      }
     } catch (e) {
       pending = new Set();
       polling = false;
       syncButton();
       notice(String(e.message || e), true);
     } finally {
+      pending = new Set();
       polling = false;
     }
   }
 
   if (btn && cfg.dispatch) {
-    btn.addEventListener("click", onRefresh);
+    btn.addEventListener("click", () => onRefresh("scrape"));
+    // Delegated: renderLegend rewrites that element on every poll, so a handler bound
+    // to the link itself would be thrown away a minute later.
+    const legendEl = $("legend");
+    if (legendEl) {
+      legendEl.addEventListener("click", (e) => {
+        if (e.target && e.target.id === "cm-balance") {
+          e.preventDefault();
+          onRefresh("balance");
+        }
+      });
+    }
     if (tokenToggle) {
       tokenToggle.addEventListener("click", () => showTokenField(tokenInput.hidden, true));
     }

@@ -24,6 +24,40 @@ const OUT = path.join(__dirname, "web", "cardmarket.json");
 
 const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY;
 
+// The parts of a previous result that are data rather than config: everything the
+// scrape produced, nothing the config owns.
+function pickData(r) {
+  const out = { offers: r.offers || [], fetchedAt: r.fetchedAt || null };
+  if (r.triedAt) out.triedAt = r.triedAt;
+  if (r.failures) out.failures = r.failures;
+  if (r.error) out.error = r.error;
+  return out;
+}
+
+// The file must always describe EVERY watched card, not just this run's selection.
+// A targeted run only fetches the cards you ticked, so writing its results verbatim
+// would delete every other card's offers from the snapshot — one press of the button
+// and the other cards go blank until they are individually re-scraped.
+function mergeResults(products, freshResults, prevResults) {
+  const fresh = new Map(freshResults.map((r) => [r.productUrl, r]));
+  const carried = new Map(prevResults.map((r) => [r.productUrl, r]));
+  return products.map(
+    (p) =>
+      fresh.get(p.productUrl) ||
+      // Keep the old offers, but re-apply the current config fields so a renamed group
+      // or corrected URL shows up without waiting for that card's next scrape.
+      (carried.has(p.productUrl)
+        ? { ...p, ...pickData(carried.get(p.productUrl)) }
+        : { ...p, offers: [], fetchedAt: null }),
+  );
+}
+
+function write(meta, results) {
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), meta, results }, null, 0));
+  console.log(`wrote ${OUT} (${results.length} entries)`);
+}
+
 function readPrev() {
   const i = process.argv.indexOf("--prev");
   const file = i !== -1 ? process.argv[i + 1] : null;
@@ -64,10 +98,47 @@ function readPrev() {
   const dumpDir = dumpIdx !== -1 ? process.argv[dumpIdx + 1] : null;
   if (dumpDir) fs.mkdirSync(dumpDir, { recursive: true });
 
+  // CM_DEBUG publishes one article row's raw HTML into meta.debug. Cardmarket cannot be
+  // fetched from a dev box (Cloudflare), so this is the only way to check the parser's
+  // regexes against markup that actually exists — currently the per-row set link, which
+  // matches nothing on the live all-versions page.
+  const debugSample = /^(true|1|yes)$/i.test(process.env.CM_DEBUG || "");
+  let sample = null;
+
   // CM_CARDS is the site's tick-box selection, passed through workflow_dispatch.
   const chosen = cardmarket.selectProducts(products, process.env.CM_CARDS);
   if (chosen.length !== products.length) {
     console.log(`selection: ${chosen.length} of ${products.length} card(s) — ${chosen.map((p) => p.group).join(", ")}`);
+  }
+
+  // CM_BALANCE_ONLY answers "how many credits do I have left?" without scraping
+  // anything. Reading the balance is not billed, so this costs nothing — it exists
+  // because otherwise the only way to refresh that number is to spend credits.
+  if (/^(true|1|yes)$/i.test(process.env.CM_BALANCE_ONLY || "")) {
+    const now = Date.now();
+    const today = cardmarket.utcDay(now);
+    const base = prev.meta && prev.meta.day === today ? prev.meta : { day: today, scrapes: 0, credits: 0 };
+    const meta = { ...base, day: today };
+    const credits = await cardmarket.getCredits(FIRECRAWL_KEY);
+    if (credits) {
+      const allowance = cardmarket.dailyCreditAllowance(credits, {
+        minCredits: pick("cardmarketMinCredits", cardmarket.DEFAULT_MIN_CREDITS),
+        monthlyCredits: pick("cardmarketMonthlyCredits", cardmarket.DEFAULT_MONTHLY_CREDITS),
+        now,
+      });
+      meta.remaining = credits.remaining;
+      if (allowance != null) meta.allowance = Math.round(allowance * 10) / 10;
+      console.log(
+        `Firecrawl balance: ${credits.remaining}${credits.plan ? "/" + credits.plan : ""} credits` +
+          (credits.periodEnd ? `, period ends ${String(credits.periodEnd).slice(0, 10)}` : "") +
+          ` · allowance ${meta.allowance}/day · ${meta.credits} spent today`,
+      );
+    } else {
+      console.error("could not read the Firecrawl balance");
+      process.exit(1);
+    }
+    write(meta, mergeResults(products, [], prev.results));
+    return;
   }
 
   // CM_FORCE is set by the site's "↻ CM" button (a workflow_dispatch input). A manual
@@ -88,13 +159,22 @@ function readPrev() {
     monthlyCredits: pick("cardmarketMonthlyCredits", cardmarket.DEFAULT_MONTHLY_CREDITS),
     country: CONFIG.cardmarketCountry || null,
     checkCredits: true,
-    onHtml: dumpDir
-      ? (p, html) => {
-          const f = path.join(dumpDir, p.productUrl.replace(/[^a-z0-9]+/gi, "-").slice(-80) + ".html");
-          fs.writeFileSync(f, html);
-          console.log("  dumped " + f);
+    onHtml: (p, html) => {
+      if (dumpDir) {
+        const f = path.join(dumpDir, p.productUrl.replace(/[^a-z0-9]+/gi, "-").slice(-80) + ".html");
+        fs.writeFileSync(f, html);
+        console.log("  dumped " + f);
+      }
+      // First article row of the first all-versions page scraped: enough to see how a
+      // row identifies its printing, small enough to sit in the published JSON.
+      if (debugSample && !sample && p.allVersions) {
+        const i = html.indexOf('id="articleRow');
+        if (i !== -1) {
+          sample = { url: p.productUrl, row: html.slice(i - 400 < 0 ? 0 : i - 400, i + 2600) };
+          console.log(`  captured a ${sample.row.length}-char sample row from ${p.group}`);
         }
-      : null,
+      }
+    },
   });
 
   // A run that scraped nothing is normal (everything fresh, or budget spent) — but it
@@ -103,10 +183,9 @@ function readPrev() {
     `Cardmarket: ${out.scraped} scrape(s); ${out.meta.credits} credit(s) spent on ${out.meta.day}`,
   );
 
-  fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(
-    OUT,
-    JSON.stringify({ updatedAt: new Date().toISOString(), meta: out.meta, results: out.results }, null, 0),
-  );
-  console.log(`wrote ${OUT} (${out.results.length} entries)`);
+  const results = mergeResults(products, out.results, prev.results);
+  const kept = results.length - out.results.length;
+  if (kept > 0) console.log(`carried ${kept} untouched card(s) forward from the previous snapshot`);
+
+  write(sample ? { ...out.meta, debug: sample } : out.meta, results);
 })();

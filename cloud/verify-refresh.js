@@ -97,10 +97,28 @@ function check(ok, msg) {
 
   console.log("clicking dispatches the Cardmarket workflow with force=true");
   let sent = null;
+  // The page now follows the run through the Actions API as well as dispatching it.
+  const json = (o) => ({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+  const runsReply = () =>
+    json({ workflow_runs: [{ id: 7, run_number: 12, created_at: new Date().toISOString(), html_url: "https://example.com/run" }] });
+  const jobsReply = (status, conclusion, steps) => json({ jobs: [{ status, conclusion, steps }] });
   await page.route("https://api.github.com/**", (route) => {
     const r = route.request();
-    sent = { url: r.url(), method: r.method(), headers: r.headers(), body: JSON.parse(r.postData() || "{}") };
-    route.fulfill({ status: 204, body: "" });
+    const u = r.url();
+    if (u.includes("/dispatches")) {
+      sent = { url: u, method: r.method(), headers: r.headers(), body: JSON.parse(r.postData() || "{}") };
+      return route.fulfill({ status: 204 });
+    }
+    if (u.includes("/runs?event=")) return route.fulfill(runsReply());
+    if (u.includes("/jobs")) {
+      return route.fulfill(
+        jobsReply("in_progress", null, [
+          { name: "Set up job", status: "completed", conclusion: "success" },
+          { name: "Scrape Cardmarket -> cloud/web/cardmarket.json", status: "in_progress", conclusion: null },
+        ]),
+      );
+    }
+    return route.fulfill(json({}));
   });
   await page.locator("#cm-refresh").click();
   await page.waitForTimeout(800);
@@ -109,8 +127,15 @@ function check(ok, msg) {
   check(sent && sent.body.ref === "main", "dispatches against main");
   check(sent && sent.body.inputs && sent.body.inputs.force === "true", "sends force=true so the TTL is ignored");
   check(sent && sent.body.inputs.cards === "", "no ticks = empty card list = the normal rotation");
+  check(sent && sent.body.inputs.balance_only === "false", "a scrape is not a balance check");
+  check((await page.locator("#grid table th.c-seller").count()) === 0, "the Seller column is gone");
+  check((await page.locator("#grid table th.c-src").count()) > 0, "the Src column is present");
   check(sent && sent.headers.authorization === "Bearer github_pat_testtoken123", "authorises with the token from localStorage");
-  check((await page.locator("#cm-refresh").textContent()).includes("scraping"), "button reports progress while the run is in flight");
+  check((await page.locator("#cm-refresh").textContent()).match(/queued|scraping/), "button reports progress: " + await page.locator("#cm-refresh").textContent());
+  await page.waitForTimeout(3500);
+  const prog = await page.locator("#notice").textContent();
+  check(prog.includes("scraping Cardmarket"), "the notice names the step actually running: " + prog.slice(0, 90));
+  check(prog.includes("run #12"), "and links the run");
 
   console.log("each card says when it was last scraped");
   check(
@@ -153,9 +178,23 @@ function check(ok, msg) {
   await boxes.nth(1).check();
   check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "the button counts the picks");
   let picked = null;
+  // Only the dispatch carries the selection; the run/jobs polls must not be mistaken
+  // for it now that the page follows the run.
   await page.route("https://api.github.com/**", (route) => {
-    picked = JSON.parse(route.request().postData() || "{}");
-    route.fulfill({ status: 204, body: "" });
+    const u = route.request().url();
+    if (u.includes("/dispatches")) {
+      picked = JSON.parse(route.request().postData() || "{}");
+      return route.fulfill({ status: 204 });
+    }
+    if (u.includes("/runs?event=")) return route.fulfill(runsReply());
+    if (u.includes("/jobs")) {
+      return route.fulfill(
+        jobsReply("in_progress", null, [
+          { name: "Scrape Cardmarket -> cloud/web/cardmarket.json", status: "in_progress", conclusion: null },
+        ]),
+      );
+    }
+    return route.fulfill(json({}));
   });
   await page.locator("#cm-refresh").click();
   await page.waitForTimeout(800);
@@ -176,6 +215,35 @@ function check(ok, msg) {
     "the two picks survive a reload",
   );
   check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "and the button still counts them");
+  await page.close();
+
+  console.log("the balance check runs the workflow without scraping");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
+  check((await page.locator("#cm-balance").count()) === 1, "the legend offers a free balance check");
+  let balanceReq = null;
+  await page.route("https://api.github.com/**", (route) => {
+    const u = route.request().url();
+    if (u.includes("/dispatches")) {
+      balanceReq = JSON.parse(route.request().postData() || "{}");
+      return route.fulfill({ status: 204 });
+    }
+    if (u.includes("/runs?event=")) return route.fulfill(runsReply());
+    if (u.includes("/jobs")) {
+      return route.fulfill(
+        jobsReply("in_progress", null, [{ name: "Set up job", status: "in_progress", conclusion: null }]),
+      );
+    }
+    return route.fulfill(json({}));
+  });
+  await page.locator("#cm-balance").click();
+  await page.waitForTimeout(800);
+  check(balanceReq && balanceReq.inputs.balance_only === "true", "sends balance_only=true");
+  check(balanceReq && balanceReq.inputs.force === "false", "does not force a scrape");
+  check(balanceReq && balanceReq.inputs.cards === "", "and asks for no cards");
+  check(
+    (await page.locator("#grid .card .age.pending").count()) === 0,
+    "no card is marked as scraping — nothing is being scraped",
+  );
   await page.close();
 
   console.log("the key button reopens the field, and emptying it forgets the token");
@@ -208,7 +276,7 @@ function check(ok, msg) {
   page = await open(
     `localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "expired"); window.alert = () => {};`,
   );
-  await page.route("https://api.github.com/**", (r) => r.fulfill({ status: 401, body: "{}" }));
+  await page.route("https://api.github.com/**", (r) => r.fulfill({ status: 401, body: "{}" })); // dispatch fails first
   await page.locator("#cm-refresh").click();
   await page.waitForTimeout(600);
   check(
