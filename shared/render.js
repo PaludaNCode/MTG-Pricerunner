@@ -1,5 +1,7 @@
 // Dashboard renderer for the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc }) -> { totalOffers }
+// Usage: CardUI.renderGrid(data, { showShips, showSrc, selectable, selected, onToggle })
+//   -> { totalOffers }
+// selected is a Set of group names; onToggle(group, checked) fires on a tick box.
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
@@ -73,10 +75,13 @@
       merged.sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
       if (!merged.length) { empty.push(g); continue; }
       totalOffers += merged.length;
-      cards.push({ g, merged });
+      // Only a card with a Cardmarket entry can be refreshed on demand — CardTrader
+      // is free and already refreshes everything every couple of minutes.
+      cards.push({ g, merged, refreshable: groups[g].some((p) => p.site === "cardmarket") });
     }
 
-    for (const { g, merged } of cards) {
+    const selected = opts.selected || new Set();
+    for (const { g, merged, refreshable } of cards) {
       const hiddenCount = merged.length - MAX_VISIBLE_ROWS;
       const collapsible = hiddenCount > 0;
       const collapsed = collapsible && !expandedGroups.has(g);
@@ -85,10 +90,19 @@
       ).join("");
       const toggle = collapsible ? `<tr class="row-toggle"><td colspan="${cols.length}"><button type="button">${collapsed ? `Show ${hiddenCount} more ▾` : "Show fewer ▴"}</button></td></tr>` : "";
 
+      // Credits are scarce enough that which cards get refreshed is a real choice, so
+      // each refreshable card carries a tick box. The set lives in app.js (and
+      // localStorage) rather than here, so a poll re-render doesn't clear it.
+      const pick = opts.selectable && refreshable
+        ? `<input type="checkbox" class="pick"${selected.has(g) ? " checked" : ""} aria-label="Include ${esc(g)} in the next Cardmarket refresh" title="Include in the next Cardmarket refresh">`
+        : "";
+
       const card = document.createElement("div");
       card.className = "card" + (collapsed ? " is-collapsed" : "");
-      card.innerHTML = `<h2><span>${esc(g)}</span><span class="badges"><span class="badge">${merged.length}</span></span></h2>
+      card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges"><span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}${toggle}</table>`;
+      const box = card.querySelector(".pick");
+      if (box && opts.onToggle) box.addEventListener("change", () => opts.onToggle(g, box.checked));
       if (collapsible) {
         const btn = card.querySelector(".row-toggle button");
         btn.addEventListener("click", () => {

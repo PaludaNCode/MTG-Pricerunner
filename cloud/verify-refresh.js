@@ -92,8 +92,44 @@ function check(ok, msg) {
   check(sent && sent.method === "POST" && sent.url.endsWith(DISPATCH_PATH), "targets the Cardmarket workflow's dispatch endpoint");
   check(sent && sent.body.ref === "main", "dispatches against main");
   check(sent && sent.body.inputs && sent.body.inputs.force === "true", "sends force=true so the TTL is ignored");
+  check(sent && sent.body.inputs.cards === "", "no ticks = empty card list = the normal rotation");
   check(sent && sent.headers.authorization === "Bearer test-token-123", "authorises with the token from localStorage");
   check((await page.locator("#cm-refresh").textContent()).includes("scraping"), "button reports progress while the run is in flight");
+  await page.close();
+
+  console.log("ticking cards narrows the refresh to those cards");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
+  const boxes = page.locator("#grid .card .pick");
+  const cardCount = await page.locator("#grid .card").count();
+  check((await boxes.count()) === cardCount - 1, "every card gets a tick box except the CardTrader-only one");
+  check(
+    (await page.locator("#grid .card", { hasText: "Seeker of Skybreak" }).locator(".pick").count()) === 0,
+    "a card with no Cardmarket entry cannot be picked — nothing to refresh",
+  );
+
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "the button counts the picks");
+  let picked = null;
+  await page.route("https://api.github.com/**", (route) => {
+    picked = JSON.parse(route.request().postData() || "{}");
+    route.fulfill({ status: 204, body: "" });
+  });
+  await page.locator("#cm-refresh").click();
+  await page.waitForTimeout(800);
+  check(
+    picked && picked.inputs.cards === "Runehorn Hellkite,Stock Up",
+    "only the ticked cards are sent, by name: " + (picked && picked.inputs.cards),
+  );
+  // Same page, not a new one: browser.newPage() gets a fresh context, so a reload is
+  // the only way to prove the picks came back from localStorage rather than memory.
+  await page.reload();
+  await page.waitForSelector("#grid .card");
+  check(
+    (await page.locator("#grid .card .pick:checked").count()) === 2,
+    "the two picks survive a reload",
+  );
+  check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "and the button still counts them");
   await page.close();
 
   console.log("the key button reopens the field, and emptying it forgets the token");

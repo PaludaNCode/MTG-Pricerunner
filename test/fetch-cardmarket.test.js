@@ -127,3 +127,22 @@ test("a card that keeps failing backs off to one retry a day", () => {
   assert.equal(inFailureBackoff(null, NOW), false);
   assert.equal(inFailureBackoff({ failures: 5 }, NOW), false, "no attempt timestamp -> no backoff");
 });
+
+test("a tick-box selection narrows the run to the named cards", () => {
+  const { selectProducts } = require("../cloud/fetch-cardmarket");
+  const products = [{ group: "Stock Up" }, { group: "Loch Mare" }, { group: "Skateboard" }];
+
+  assert.deepEqual(selectProducts(products, "Stock Up,Skateboard").map((p) => p.group), ["Stock Up", "Skateboard"]);
+  assert.deepEqual(selectProducts(products, " loch mare ").map((p) => p.group), ["Loch Mare"], "trimmed, case-insensitive");
+});
+
+test("an empty or unrecognised selection falls back to every card", () => {
+  const { selectProducts } = require("../cloud/fetch-cardmarket");
+  const products = [{ group: "Stock Up" }, { group: "Loch Mare" }];
+
+  assert.equal(selectProducts(products, "").length, 2, "empty = the normal rotation");
+  assert.equal(selectProducts(products, undefined).length, 2);
+  assert.equal(selectProducts(products, ",  ,").length, 2);
+  // A stale browser selection naming only removed cards must not silently scrape nothing.
+  assert.equal(selectProducts(products, "Card That Was Deleted").length, 2);
+});

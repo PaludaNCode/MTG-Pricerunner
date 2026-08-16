@@ -57,10 +57,6 @@ function readPrev() {
   const prev = readPrev();
   const pick = (key, fallback) => (CONFIG[key] != null ? CONFIG[key] : fallback);
 
-  // CM_FORCE is set by the "Refresh now" button on the site (a workflow_dispatch input).
-  // A manual press means "I want this now", so it ignores the TTL and the per-run limit
-  // — but NOT the credit allowance or the reserve. On-demand must never be able to
-  // outspend the plan; the worst it can do is use today's allowance sooner.
   // --dump <dir> saves each scraped page's raw HTML. Cardmarket can't be fetched from a
   // dev box either (Cloudflare), so this is the way to get a real page in front of the
   // parser when its regexes need checking against current markup.
@@ -68,17 +64,27 @@ function readPrev() {
   const dumpDir = dumpIdx !== -1 ? process.argv[dumpIdx + 1] : null;
   if (dumpDir) fs.mkdirSync(dumpDir, { recursive: true });
 
+  // CM_CARDS is the site's tick-box selection, passed through workflow_dispatch.
+  const chosen = cardmarket.selectProducts(products, process.env.CM_CARDS);
+  if (chosen.length !== products.length) {
+    console.log(`selection: ${chosen.length} of ${products.length} card(s) — ${chosen.map((p) => p.group).join(", ")}`);
+  }
+
+  // CM_FORCE is set by the site's "↻ CM" button (a workflow_dispatch input). A manual
+  // press means "I want this now", so it ignores the TTL and the per-run limit — but
+  // NOT the credit allowance or the reserve. On-demand must never be able to outspend
+  // the plan; the worst it can do is use today's allowance sooner.
   const force = /^(true|1|yes)$/i.test(process.env.CM_FORCE || "");
   if (force) console.log("forced refresh: ignoring the TTL and per-run limit (credit allowance still applies)");
 
-  const out = await cardmarket.fetchAll(products, {
+  const out = await cardmarket.fetchAll(chosen, {
     apiKey: FIRECRAWL_KEY,
     prev: prev.results,
     meta: prev.meta,
     ttlMinutes: force ? 0 : pick("cardmarketTtlMinutes", cardmarket.DEFAULT_TTL_MINUTES),
     dailyBudget: pick("cardmarketDailyBudget", cardmarket.DEFAULT_DAILY_BUDGET),
     minCredits: pick("cardmarketMinCredits", cardmarket.DEFAULT_MIN_CREDITS),
-    perRunLimit: force ? products.length : pick("cardmarketPerRunLimit", cardmarket.DEFAULT_PER_RUN_LIMIT),
+    perRunLimit: force ? chosen.length : pick("cardmarketPerRunLimit", cardmarket.DEFAULT_PER_RUN_LIMIT),
     monthlyCredits: pick("cardmarketMonthlyCredits", cardmarket.DEFAULT_MONTHLY_CREDITS),
     country: CONFIG.cardmarketCountry || null,
     checkCredits: true,

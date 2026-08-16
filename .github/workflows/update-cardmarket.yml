@@ -17,6 +17,10 @@ on:
         description: "Ignore the TTL and per-run limit (the credit allowance still applies)"
         type: boolean
         default: false
+      cards:
+        description: "Comma-separated card names to scrape. Empty = every card, stalest first."
+        type: string
+        default: ""
   push:
     branches: [main]
     paths:
@@ -67,6 +71,7 @@ jobs:
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           CM_FORCE: ${{ inputs.force }}
+          CM_CARDS: ${{ inputs.cards }}
       # Same build-artifact pattern as the `data` branch: a single orphan commit,
       # force-pushed every run. Never branch from it or PR into it.
       - name: Publish cardmarket.json to the data-cm branch

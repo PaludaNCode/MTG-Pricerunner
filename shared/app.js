@@ -32,7 +32,13 @@
         updatedAt: ct && ct.updatedAt,
         results: [...((ct && ct.results) || []), ...((cm && cm.results) || [])],
       };
-      const { totalOffers } = CardUI.renderGrid(data, { showShips: true, showSrc: cfg.showSrc !== false });
+      const { totalOffers } = CardUI.renderGrid(data, {
+        showShips: true,
+        showSrc: cfg.showSrc !== false,
+        selectable: !!cfg.dispatch,
+        selected: picks,
+        onToggle,
+      });
 
       const cmAge = cm && cm.updatedAt ? ageLabel(cm.updatedAt) : null;
       $("updated").textContent =
@@ -55,6 +61,26 @@
   // browser's localStorage, meaning the button only works for whoever holds a token.
   // Visitors without one can look but not spend.
   const TOKEN_KEY = "mtg-pricerunner.gh-token";
+  // Which cards the next on-demand refresh should spend credits on. Empty = all of
+  // them, rotated stalest-first by the fetcher (the hourly cron's normal behaviour).
+  const PICKS_KEY = "mtg-pricerunner.cm-picks";
+  const picks = new Set(loadPicks());
+
+  function loadPicks() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PICKS_KEY) || "[]");
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  }
+  function onToggle(group, checked) {
+    if (checked) picks.add(group);
+    else picks.delete(group);
+    localStorage.setItem(PICKS_KEY, JSON.stringify([...picks]));
+    syncButton();
+  }
+
   const btn = $("cm-refresh");
   const tokenInput = $("cm-token");
   const tokenToggle = $("cm-token-toggle");
@@ -105,12 +131,16 @@
   // Single place that decides what the button says: mid-run > no token > no budget > ready.
   function syncButton() {
     if (!btn || polling) return;
-    if (!getToken()) return setBtn("↻ CM", true, "Enter a GitHub token (⚿) to refresh on demand");
+    const label = picks.size ? `↻ CM (${picks.size})` : "↻ CM";
+    if (!getToken()) return setBtn(label, true, "Enter a GitHub token (⚿) to refresh on demand");
     const b = budgetState(lastMeta);
+    const scope = picks.size
+      ? `Scrape the ${picks.size} ticked card(s)`
+      : "Scrape Cardmarket — no cards ticked, so the stalest go first";
     setBtn(
-      b.spent ? "CM budget spent" : "↻ CM",
+      b.spent ? "CM budget spent" : label,
       b.spent,
-      b.spent ? b.note + " — next allowance at 00:00 UTC" : b.note || "Scrape Cardmarket now",
+      b.spent ? b.note + " — next allowance at 00:00 UTC" : scope + (b.note ? " · " + b.note : ""),
     );
   }
 
@@ -130,7 +160,12 @@
           Accept: "application/vnd.github+json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ref: d.ref || "main", inputs: { force: "true" } }),
+        // `cards` empty means "whatever is stalest"; a tick list narrows the run to
+        // exactly those, so a scarce allowance goes where it was asked to go.
+        body: JSON.stringify({
+          ref: d.ref || "main",
+          inputs: { force: "true", cards: [...picks].join(",") },
+        }),
       },
     );
     // 401/403 = the PAT is wrong or expired (they last a year). Drop it so the next

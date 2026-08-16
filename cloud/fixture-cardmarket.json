@@ -1,19 +1,32 @@
 {
-  "_note": "Offline Cardmarket feed for cloud/verify-mobile.js — mirrors what update-cardmarket.yml publishes to the data-cm branch, including the credit ledger in meta.",
+  "_note": "Offline Cardmarket feed for the browser checks. Mirrors what update-cardmarket.yml publishes to the data-cm branch, including the credit ledger in meta. Offers carry their own variant/productUrl, as they do when scraped from an all-versions (/Magic/Cards/) page.",
   "updatedAt": "2026-01-01T09:00:00.000Z",
   "meta": { "day": "2026-01-01", "scrapes": 2, "credits": 10, "costPerScrape": 5, "remaining": 964, "allowance": 33.1 },
   "results": [
     {
-      "site": "cardmarket",
-      "group": "Fixture Card",
-      "variant": "Extended Art",
-      "code": "ZNR",
-      "name": "Fixture Card — Extended Art",
-      "productUrl": "https://example.com/cm/1",
-      "fetchedAt": "2026-01-01T11:40:00.000Z",
+      "site": "cardmarket", "group": "Runehorn Hellkite", "variant": "All printings", "code": null,
+      "name": "Runehorn Hellkite", "productUrl": "https://example.com/cm/runehorn",
+      "fetchedAt": "2026-01-01T08:40:00.000Z",
       "offers": [
-        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": null, "productUrl": null },
-        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Commander 2016", "productUrl": "https://example.com/cm/c16" }
+        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Commander 2016", "productUrl": "https://example.com/cm/c16" },
+        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Starter Commander Decks", "productUrl": "https://example.com/cm/scd" }
+      ]
+    },
+    {
+      "site": "cardmarket", "group": "Stock Up", "variant": "All printings", "code": null,
+      "name": "Stock Up", "productUrl": "https://example.com/cm/stockup",
+      "fetchedAt": "2026-01-01T07:10:00.000Z",
+      "offers": [
+        { "price": 6.9, "priceStr": "6.90 €", "foil": false, "condition": "NM", "qty": 4, "seller": "TokyoCards", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Aetherdrift", "productUrl": "https://example.com/cm/dft" },
+        { "price": 24.0, "priceStr": "24.00 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ArchiveSeller", "location": "Italy", "language": null, "shipsToMe": null, "variant": "Mystical Archive", "productUrl": "https://example.com/cm/soa" }
+      ]
+    },
+    {
+      "site": "cardmarket", "group": "Agadeem's Awakening", "variant": "All printings", "code": null,
+      "name": "Agadeem's Awakening", "productUrl": "https://example.com/cm/agadeem",
+      "fetchedAt": "2025-12-30T22:00:00.000Z",
+      "offers": [
+        { "price": 19.5, "priceStr": "19.50 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising", "productUrl": "https://example.com/cm/znr" }
       ]
     }
   ]

@@ -120,6 +120,21 @@ function inFailureBackoff(prev, now) {
   return Number.isFinite(since) && since >= 0 && since < FAILURE_BACKOFF_MS;
 }
 
+// Narrows a run to named cards. The site's tick boxes send a comma-separated list of
+// group names, so a scarce allowance can be aimed at the cards that matter today
+// instead of being spread over the whole rotation. Empty/absent = every card.
+// Unknown names are ignored rather than fatal: the list comes from a browser whose
+// localStorage may predate a config edit.
+function selectProducts(products, csv) {
+  const wanted = String(csv || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (!wanted.length) return products;
+  const picked = products.filter((p) => wanted.includes(String(p.group || "").toLowerCase()));
+  return picked.length ? picked : products;
+}
+
 // Raised when the account is out of credits or the key is bad: retrying the remaining
 // cards would fail identically, so the caller stops the whole Cardmarket pass.
 class FirecrawlFatal extends Error {}
@@ -371,6 +386,7 @@ function carryForward(product, prevResult, error, now) {
 
 module.exports = {
   fetchAll,
+  selectProducts,
   isFresh,
   lastAttempt,
   inFailureBackoff,

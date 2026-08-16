@@ -1,54 +1,59 @@
 {
+  "_note": "Offline CardTrader feed for the browser checks. Mirrors what update-data.yml publishes to the data branch. Includes a card with no Cardmarket counterpart (Seeker of Skybreak) so the checks cover a card that cannot be refreshed on demand, plus an empty and an errored card for the 'watching' chips.",
   "updatedAt": "2026-01-01T12:00:00.000Z",
   "results": [
     {
-      "site": "cardtrader",
-      "group": "Fixture Card",
-      "variant": "Extended Art",
-      "code": "ZNR",
-      "name": "Fixture Card — Extended Art",
-      "productUrl": "https://example.com/1",
+      "site": "cardtrader", "group": "Runehorn Hellkite", "variant": "Commander 2016", "code": "C16",
+      "name": "Runehorn Hellkite — Commander 2016", "productUrl": "https://example.com/ct/1",
       "offers": [
         { "price": 4.11, "priceStr": "4.11 €", "foil": false, "condition": "Near Mint", "qty": 7, "seller": "ShortName", "shipsToMe": true },
-        { "price": 28.4, "priceStr": "28.40 €", "foil": true, "condition": "Excellent", "qty": 1, "seller": "AVeryLongSellerName123", "shipsToMe": false },
-        { "price": 10046.64, "priceStr": "10046.64 €", "foil": true, "condition": "Mint", "qty": 2, "seller": "Zio_Peppino", "shipsToMe": null },
         { "price": 5.2, "priceStr": "5.20 €", "foil": false, "condition": "Near Mint", "qty": 3, "seller": "Seller04", "shipsToMe": true },
-        { "price": 5.9, "priceStr": "5.90 €", "foil": false, "condition": "Excellent", "qty": 1, "seller": "Seller05", "shipsToMe": false },
-        { "price": 6.5, "priceStr": "6.50 €", "foil": false, "condition": "Good", "qty": 2, "seller": "Seller06", "shipsToMe": true },
+        { "price": 28.4, "priceStr": "28.40 €", "foil": true, "condition": "Excellent", "qty": 1, "seller": "AVeryLongSellerName123", "shipsToMe": false },
+        { "price": 10046.64, "priceStr": "10046.64 €", "foil": true, "condition": "Mint", "qty": 2, "seller": "Zio_Peppino", "shipsToMe": null }
+      ]
+    },
+    {
+      "site": "cardtrader", "group": "Runehorn Hellkite", "variant": "Starter Cmdr Decks", "code": "SCD",
+      "name": "Runehorn Hellkite — Starter Cmdr Decks", "productUrl": "https://example.com/ct/2",
+      "offers": [
+        { "price": 6.5, "priceStr": "6.50 €", "foil": false, "condition": "Good", "qty": 2, "seller": "Seller06", "shipsToMe": true }
+      ]
+    },
+    {
+      "site": "cardtrader", "group": "Stock Up", "variant": "Aetherdrift", "code": "DFT",
+      "name": "Stock Up — Aetherdrift", "productUrl": "https://example.com/ct/3",
+      "offers": [
         { "price": 7.1, "priceStr": "7.10 €", "foil": true, "condition": "Near Mint", "qty": 1, "seller": "Seller07", "shipsToMe": null },
         { "price": 8.25, "priceStr": "8.25 €", "foil": false, "condition": "Played", "qty": 4, "seller": "Seller08", "shipsToMe": true },
         { "price": 9.0, "priceStr": "9.00 €", "foil": false, "condition": "Near Mint", "qty": 1, "seller": "Seller09", "shipsToMe": false },
         { "price": 11.4, "priceStr": "11.40 €", "foil": false, "condition": "Excellent", "qty": 2, "seller": "Seller10", "shipsToMe": true },
         { "price": 13.75, "priceStr": "13.75 €", "foil": true, "condition": "Mint", "qty": 1, "seller": "Seller11", "shipsToMe": null },
-        { "price": 15.6, "priceStr": "15.60 €", "foil": false, "condition": "Light Played", "qty": 5, "seller": "Seller12", "shipsToMe": true }
-      ]
-    },
-    {
-      "site": "cardtrader",
-      "group": "Fixture Card",
-      "variant": "Prerelease",
-      "name": "Fixture Card — Prerelease",
-      "productUrl": "https://example.com/2",
-      "offers": [
+        { "price": 15.6, "priceStr": "15.60 €", "foil": false, "condition": "Light Played", "qty": 5, "seller": "Seller12", "shipsToMe": true },
         { "price": 18.05, "priceStr": "18.05 €", "foil": false, "condition": "Light Played", "qty": 1, "seller": "Dualgames", "shipsToMe": true }
       ]
     },
     {
-      "site": "cardtrader",
-      "group": "Empty Watch",
-      "variant": "Promos",
-      "name": "Empty Watch — Promos",
-      "productUrl": "https://example.com/3",
-      "offers": []
+      "site": "cardtrader", "group": "Agadeem's Awakening", "variant": "Zendikar Rising", "code": "ZNR",
+      "name": "Agadeem's Awakening — Zendikar Rising", "productUrl": "https://example.com/ct/4",
+      "offers": [
+        { "price": 21.0, "priceStr": "21.00 €", "foil": false, "condition": "Near Mint", "qty": 2, "seller": "JPStore", "shipsToMe": true }
+      ]
     },
     {
-      "site": "cardtrader",
-      "group": "Broken Watch",
-      "variant": "Zendikar Rising",
-      "name": "Broken Watch — Zendikar Rising",
-      "productUrl": "https://example.com/4",
-      "offers": [],
-      "error": "HTTP 429"
+      "site": "cardtrader", "group": "Seeker of Skybreak", "variant": "Tempest", "code": "TMP",
+      "name": "Seeker of Skybreak — Tempest", "productUrl": "https://example.com/ct/5",
+      "offers": [
+        { "price": 2.4, "priceStr": "2.40 €", "foil": false, "condition": "Excellent", "qty": 3, "seller": "OldSchool", "shipsToMe": true }
+      ]
+    },
+    {
+      "site": "cardtrader", "group": "Empty Watch", "variant": "Promos", "code": "PZNR",
+      "name": "Empty Watch — Promos", "productUrl": "https://example.com/ct/6", "offers": []
+    },
+    {
+      "site": "cardtrader", "group": "Broken Watch", "variant": "Zendikar Rising", "code": "ZNR",
+      "name": "Broken Watch — Zendikar Rising", "productUrl": "https://example.com/ct/7",
+      "offers": [], "error": "HTTP 429"
     }
   ]
 }
