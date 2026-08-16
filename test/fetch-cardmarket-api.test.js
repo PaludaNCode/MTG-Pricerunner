@@ -329,3 +329,21 @@ test("the run books what it actually spent and learns the cost", async () => {
     },
   );
 });
+
+test("a 404 from Cardmarket is an error, not a silent zero-offer card", async () => {
+  await withStub(
+    ({ url }) =>
+      url === "/v2/team/credit-usage"
+        ? [200, { success: true, data: { remainingCredits: 1000 } }]
+        // Firecrawl reports a successful scrape of a 404 page — the mistyped-slug case.
+        : [200, { success: true, data: { rawHtml: "<html>Page not found</html>", metadata: { statusCode: 404 } } }],
+    async (mod, seen) => {
+      const { results } = await mod.fetchAll([product(1), product(2)], {
+        apiKey: "fc-test", perRunLimit: 2, now: NOW, ...FAST,
+      });
+      assert.match(results[0].error, /404/, "the bad URL is flagged");
+      assert.equal(scrapesIn(seen).length, 2, "and the other cards still get their turn");
+      assert.equal(seen.filter((s) => s.url === "/v2/scrape").length, 2, "404 is not retried");
+    },
+  );
+});

@@ -155,6 +155,15 @@ async function scrapeHtml(url, { apiKey, country, retryBackoffMs = 3000 }) {
       /* non-JSON error body */
     }
     if (res.ok && json && json.success && json.data) {
+      // A mistyped card slug is a 404 that Firecrawl reports as a *successful* scrape:
+      // the parser then finds no article rows and the card silently shows no offers
+      // forever, costing a credit every run. Fail loudly on the upstream status instead.
+      const upstream = json.data.metadata && json.data.metadata.statusCode;
+      // Thrown, not retried (a 404 stays a 404) — and a plain Error, not FirecrawlFatal,
+      // so one bad URL fails its own card without stopping the rest of the pass.
+      if (typeof upstream === "number" && upstream >= 400) {
+        throw new Error(`Cardmarket returned HTTP ${upstream} — check the URL`);
+      }
       const html = json.data.rawHtml || json.data.html || "";
       if (looksBlocked(html)) {
         last = "Cloudflare challenge returned instead of the page";
