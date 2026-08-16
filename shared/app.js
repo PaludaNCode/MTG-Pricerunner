@@ -42,14 +42,8 @@
 
       // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
       window.__cmUpdatedAt = cm && cm.updatedAt;
-      if (!polling) {
-        const b = budgetState(cm && cm.meta);
-        setBtn(
-          b.spent ? "CM budget spent" : "↻ CM",
-          b.spent,
-          b.note ? b.note + (b.spent ? " — next allowance at 00:00 UTC" : "") : "Scrape Cardmarket now",
-        );
-      }
+      lastMeta = cm && cm.meta;
+      syncButton();
     } catch (e) {
       $("updated").textContent = "load failed: " + e;
     }
@@ -62,13 +56,38 @@
   // Visitors without one can look but not spend.
   const TOKEN_KEY = "mtg-pricerunner.gh-token";
   const btn = $("cm-refresh");
-  let polling = null;
+  const tokenInput = $("cm-token");
+  const tokenToggle = $("cm-token-toggle");
+  let polling = false;
+  let lastMeta = null;
+
+  const getToken = () => (localStorage.getItem(TOKEN_KEY) || "").trim();
+
+  // The field is only in the way once a token is stored, so it hides itself then and
+  // the ⚿ button brings it back to change or clear it.
+  function showTokenField(show, prefill) {
+    if (!tokenInput) return;
+    tokenInput.hidden = !show;
+    if (show) {
+      tokenInput.value = prefill ? getToken() : "";
+      tokenInput.focus();
+    }
+  }
+
+  function saveToken() {
+    if (!tokenInput) return;
+    const v = tokenInput.value.trim();
+    if (v) localStorage.setItem(TOKEN_KEY, v);
+    else localStorage.removeItem(TOKEN_KEY); // clearing the field forgets the token
+    showTokenField(!v, false);
+    syncButton();
+  }
 
   const setBtn = (label, disabled, title) => {
     if (!btn) return;
     btn.textContent = label;
     btn.disabled = !!disabled;
-    if (title) btn.title = title;
+    btn.title = title || "";
   };
 
   // Reflect the published credit ledger: a run with no allowance left would defer every
@@ -83,17 +102,24 @@
     };
   }
 
+  // Single place that decides what the button says: mid-run > no token > no budget > ready.
+  function syncButton() {
+    if (!btn || polling) return;
+    if (!getToken()) return setBtn("↻ CM", true, "Enter a GitHub token (⚿) to refresh on demand");
+    const b = budgetState(lastMeta);
+    setBtn(
+      b.spent ? "CM budget spent" : "↻ CM",
+      b.spent,
+      b.spent ? b.note + " — next allowance at 00:00 UTC" : b.note || "Scrape Cardmarket now",
+    );
+  }
+
   async function dispatch() {
     const d = cfg.dispatch;
-    let token = localStorage.getItem(TOKEN_KEY);
+    const token = getToken();
     if (!token) {
-      token = window.prompt(
-        "GitHub token (fine-grained PAT, Actions: read and write on this repo).\n" +
-          "Stored only in this browser — never sent anywhere but api.github.com.",
-      );
-      if (!token) return;
-      localStorage.setItem(TOKEN_KEY, token.trim());
-      token = token.trim();
+      showTokenField(true, false);
+      throw new Error("enter a GitHub token first");
     }
     const res = await fetch(
       `https://api.github.com/repos/${d.repo}/actions/workflows/${d.workflow}/dispatches`,
@@ -111,7 +137,8 @@
     // click asks again instead of failing forever.
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem(TOKEN_KEY);
-      throw new Error("token rejected (" + res.status + ") — it was cleared, try again");
+      showTokenField(true, false);
+      throw new Error("token rejected (" + res.status + ") — it was cleared, enter a new one");
     }
     if (res.status !== 204) throw new Error("dispatch failed: HTTP " + res.status);
   }
@@ -136,18 +163,41 @@
       await dispatch();
       setBtn("scraping…", true, "Cardmarket scrape running");
       const ok = await waitForNewData(before, Date.now() + 180000);
-      setBtn(ok ? "↻ CM" : "timed out", false, ok ? "" : "no new snapshot within 3 min — check the Actions tab");
+      // Clear the flag first so the re-render's syncButton() can reflect the credits the
+      // run just spent, then let a timeout message override it.
+      polling = false;
       await refresh();
+      if (!ok) setBtn("timed out", false, "no new snapshot within 3 min — check the Actions tab");
     } catch (e) {
-      setBtn("↻ CM", false);
+      polling = false;
+      syncButton();
       window.alert(String(e.message || e));
     } finally {
       polling = false;
     }
   }
 
-  if (btn && cfg.dispatch) btn.addEventListener("click", onRefresh);
-  else if (btn) btn.hidden = true;
+  if (btn && cfg.dispatch) {
+    btn.addEventListener("click", onRefresh);
+    if (tokenToggle) {
+      tokenToggle.addEventListener("click", () => showTokenField(tokenInput.hidden, true));
+    }
+    if (tokenInput) {
+      // Enter commits; blur commits too, so a click straight onto ↻ CM still works.
+      tokenInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); saveToken(); }
+        if (e.key === "Escape") showTokenField(false, false);
+      });
+      tokenInput.addEventListener("blur", saveToken);
+      // No token yet? Lead with the field rather than a disabled button and no clue why.
+      if (!getToken()) tokenInput.hidden = false;
+    }
+    syncButton();
+  } else if (btn) {
+    btn.hidden = true;
+    if (tokenInput) tokenInput.hidden = true;
+    if (tokenToggle) tokenToggle.hidden = true;
+  }
 
   refresh();
   setInterval(refresh, cfg.intervalMs || 60000);

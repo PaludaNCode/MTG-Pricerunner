@@ -61,9 +61,22 @@ function check(ok, msg) {
     return page;
   };
 
-  console.log("budget available -> the button offers a refresh");
-  let page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
-  check(await page.locator("#cm-refresh").isEnabled(), "button is enabled");
+  console.log("no token stored -> the field is offered and the button holds back");
+  let page = await open();
+  check(!(await page.locator("#cm-token").isHidden()), "token field is visible from the start");
+  check(await page.locator("#cm-refresh").isDisabled(), "refresh is disabled until a token exists");
+  check((await page.getAttribute("#cm-refresh", "title")).toLowerCase().includes("token"), "tooltip explains why");
+
+  console.log("typing a token into the field stores it and arms the button");
+  await page.fill("#cm-token", "test-token-123");
+  await page.press("#cm-token", "Enter");
+  await page.waitForTimeout(200);
+  check(
+    (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === "test-token-123",
+    "token saved to localStorage",
+  );
+  check(await page.locator("#cm-token").isHidden(), "field hides itself once a token is set");
+  check(await page.locator("#cm-refresh").isEnabled(), "refresh is now armed");
   check((await page.getAttribute("#cm-refresh", "title")).includes("10 of 33"), "tooltip reports the day's credit use");
 
   console.log("clicking dispatches the Cardmarket workflow with force=true");
@@ -81,6 +94,22 @@ function check(ok, msg) {
   check(sent && sent.body.inputs && sent.body.inputs.force === "true", "sends force=true so the TTL is ignored");
   check(sent && sent.headers.authorization === "Bearer test-token-123", "authorises with the token from localStorage");
   check((await page.locator("#cm-refresh").textContent()).includes("scraping"), "button reports progress while the run is in flight");
+  await page.close();
+
+  console.log("the key button reopens the field, and emptying it forgets the token");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
+  check(await page.locator("#cm-token").isHidden(), "field starts hidden when a token exists");
+  await page.locator("#cm-token-toggle").click();
+  check(!(await page.locator("#cm-token").isHidden()), "key button reveals the field");
+  check((await page.inputValue("#cm-token")) === "test-token-123", "field is prefilled so it can be edited");
+  await page.fill("#cm-token", "");
+  await page.press("#cm-token", "Enter");
+  await page.waitForTimeout(200);
+  check(
+    (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === null,
+    "clearing the field forgets the token",
+  );
+  check(await page.locator("#cm-refresh").isDisabled(), "refresh disarms again");
   await page.close();
 
   console.log("no allowance left -> the button refuses instead of firing a no-op run");
@@ -104,6 +133,7 @@ function check(ok, msg) {
     (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === null,
     "the 401'd token was cleared from localStorage",
   );
+  check(!(await page.locator("#cm-token").isHidden()), "the field reopens so a new token can be entered");
   await page.close();
 
   await browser.close();

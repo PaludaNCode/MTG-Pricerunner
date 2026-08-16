@@ -127,10 +127,12 @@ can never overspend the plan. When the allowance is gone the button greys itself
 and says so, rather than firing a run that would defer every card.
 
 Triggering a workflow needs a GitHub PAT with `Actions: read and write`, and this site
-is public — so the token is **not** in the page. On first click the button prompts for
-one and keeps it in that browser's `localStorage`. Anyone without a token sees the
-button but cannot use it. A token that comes back 401/403 (they expire yearly) is
-discarded automatically so the next click re-prompts.
+is public — so the token is **not** in the page. Next to the button is a token field:
+paste the PAT, press Enter, and it is kept in that browser's `localStorage`. The field
+then hides itself; the **⚿** button reopens it to change the token, and emptying it
+forgets the token entirely. Anyone without a token sees a disabled button. A token that
+comes back 401/403 (they expire yearly) is discarded automatically and the field
+reopens.
 
 Use the same fine-grained PAT the pinger uses, or mint another the same way —
 `docs/external-pinger.md` step 1 has the exact settings. After pressing, the page polls
