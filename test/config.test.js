@@ -87,3 +87,15 @@ test("every Cardmarket /Magic/Cards/ entry is marked allVersions", () => {
     }
   }
 });
+
+// The site's tick boxes come from data.json's meta.cardmarketCards, which is built from
+// these group names — so a Cardmarket entry whose group doesn't match any CardTrader
+// card would publish a name that never appears on the page, and be unpickable.
+test("every cardmarket entry shares a group with a cardtrader entry", () => {
+  const cfg = JSON.parse(raw);
+  const all = normalizeCards(cfg);
+  const ctGroups = new Set(all.filter((p) => p.site === "cardtrader").map((p) => p.group));
+  for (const p of all.filter((p) => p.site === "cardmarket")) {
+    assert.ok(ctGroups.has(p.group), `Cardmarket group "${p.group}" has no CardTrader card to attach to`);
+  }
+});

@@ -23,7 +23,15 @@ if (!TOKEN) {
 }
 
 (async () => {
-  const products = normalizeCards(CONFIG).filter((p) => p.site === "cardtrader");
+  const all = normalizeCards(CONFIG);
+  const products = all.filter((p) => p.site === "cardtrader");
+  // Which cards Cardmarket can refresh. Published here — in the feed that always
+  // exists — because the page needs it to draw the tick boxes, and the Cardmarket
+  // feed does not exist until the first successful scrape. Without this the UI is
+  // unusable exactly when you need it: nothing to tick, so no way to run the first
+  // scrape from the site.
+  const cardmarketCards = [...new Set(all.filter((p) => p.site === "cardmarket").map((p) => p.group))];
+
   const { results } = await cardtrader.fetchAll(products, { token: TOKEN });
 
   // A total wipeout means the API is down or the token expired — bail out so the last
@@ -34,6 +42,9 @@ if (!TOKEN) {
   }
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), results }, null, 0));
-  console.log(`wrote ${OUT} (${results.length} entries)`);
+  fs.writeFileSync(
+    OUT,
+    JSON.stringify({ updatedAt: new Date().toISOString(), meta: { cardmarketCards }, results }, null, 0),
+  );
+  console.log(`wrote ${OUT} (${results.length} entries, ${cardmarketCards.length} refreshable on Cardmarket)`);
 })();

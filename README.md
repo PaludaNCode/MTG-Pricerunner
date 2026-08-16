@@ -30,7 +30,7 @@ docs/                external-pinger.md — the cron-job.org pinger behind the ~
 .github/workflows/
   update.yml           CD — deploy the site to Pages (push to main only)
   update-data.yml      CardTrader refresh — every ~2 min, publishes data.json to `data`
-  update-cardmarket.yml  Cardmarket refresh — hourly, publishes cardmarket.json to `data-cm`
+  update-cardmarket.yml  Cardmarket refresh — on demand only, publishes to `data-cm`
   ci.yml               CI — syntax check + unit tests + UI smoke test (pull requests)
 ```
 
@@ -46,7 +46,8 @@ Site deploys and data refreshes are decoupled:
 - **`update-data.yml`** fetches CardTrader prices and force-pushes `data.json` as a
   single orphan commit to the **`data` branch**.
 - **`update-cardmarket.yml`** scrapes Cardmarket and force-pushes `cardmarket.json`
-  to the **`data-cm` branch**, hourly at most.
+  to the **`data-cm` branch**. It runs **only when you ask** — there is no schedule,
+  because every scrape costs credits.
 
 The live page fetches both from `raw.githubusercontent.com` and merges them, so fresh
 data needs no deploy. Both branches are build artifacts — never branch from them or PR
@@ -97,9 +98,9 @@ that file.
 | `cardmarketTtlMinutes` | 120 | Don't re-scrape a card younger than this. |
 | `cardmarketDailyBudget` | 6 | Fallback scrape cap, used only when the balance can't be read. |
 
-The TTL is deliberately low: at 2 hours the **credit allowance**, not the TTL, is what
-limits refreshes, so the plan gets spent on whatever is stalest rather than idling.
-Hourly is the cron's ceiling; most wakes will scrape nothing.
+Nothing runs on a timer. The TTL and per-run limit only apply to a run started without
+`force`; the site's button always sends `force: true`, so a press scrapes the cards you
+ticked, bounded only by the credit allowance and the reserve.
 
 **What 1000 credits/month actually buys**, across all Cardmarket cards:
 

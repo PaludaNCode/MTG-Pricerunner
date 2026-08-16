@@ -27,6 +27,7 @@
         selectable: !!cfg.dispatch,
         selected: picks,
         pending,
+        cardmarketCards: (ct && ct.meta && ct.meta.cardmarketCards) || null,
         onToggle,
       });
 
@@ -46,30 +47,34 @@
   }
 
   // What the header says about Cardmarket. Deliberately NOT the age of cardmarket.json:
-  // that file is rewritten on every hourly run even when the budget scraped nothing, so
-  // it would read "0m" while every card on screen was days old. Today's credit spend is
-  // the honest global number; per-card ages live on the cards themselves.
+  // that file is rewritten by every run even when the budget scraped nothing, so it
+  // would read "0m" while every card on screen was days old. Credit spend is the honest
+  // global number; per-card ages live on the cards themselves.
   function cmSummary(cm) {
     const m = cm && cm.meta;
-    if (!m) return "";
+    if (!m) return " · CM never scraped";
     if (m.allowance == null) return " · CM " + (m.scrapes || 0) + " scraped today";
-    return ` · CM ${m.credits || 0}/${Math.round(m.allowance)} credits today`;
+    return ` · CM ${m.credits || 0}/${Math.round(m.allowance)} credits today` +
+      (m.remaining != null ? ` (${m.remaining} left)` : "");
   }
 
-  // One line explaining the refresh model, because "why is this card 3 days old?" is
-  // otherwise unanswerable from the page.
+  // One line explaining the model, because "why is this card 3 days old?" and "what
+  // will pressing this cost me?" are otherwise unanswerable from the page.
   function renderLegend(cm) {
     const el = $("legend");
     if (!el) return;
     const m = (cm && cm.meta) || null;
     const cost = m && m.costPerScrape;
-    const perDay = m && m.allowance != null && cost ? Math.floor(m.allowance / cost) : null;
+    const left = m && m.allowance != null ? Math.max(0, m.allowance - (m.credits || 0)) : null;
+    const affordable = left != null && cost ? Math.floor(left / cost) : null;
     el.innerHTML =
-      '<span class="label">Cardmarket</span> is scraped on the hour within a daily credit budget, ' +
-      "oldest card first" +
-      (perDay ? ` — about <b>${perDay} card${perDay === 1 ? "" : "s"} a day</b>` : "") +
-      ". The chip on each card is how long ago that card was last scraped. " +
-      (cfg.dispatch ? "Tick cards to aim the next ↻ CM at them." : "");
+      '<span class="label">Cardmarket is scraped only when you ask.</span> ' +
+      "Nothing refreshes it on a timer — it costs credits, so it waits for you. " +
+      (cfg.dispatch ? "Tick the cards you want, then press ↻ CM. " : "") +
+      "The chip on each card shows how long ago that card was last scraped" +
+      (affordable != null
+        ? `, and today's budget still covers about <b>${affordable} card${affordable === 1 ? "" : "s"}</b>.`
+        : ". CardTrader keeps updating on its own, for free.");
   }
 
   // ---- On-demand Cardmarket refresh ------------------------------------------------
