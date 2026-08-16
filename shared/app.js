@@ -114,6 +114,16 @@
 
   const getToken = () => (localStorage.getItem(TOKEN_KEY) || "").trim();
 
+  // Inline feedback beats alert() here: on a phone the modal covers the field you need
+  // to fix, and the message vanishes the moment you dismiss it.
+  function notice(html, isError) {
+    const el = $("notice");
+    if (!el) return;
+    el.innerHTML = html;
+    el.className = "notice" + (isError ? " err" : "");
+    el.hidden = !html;
+  }
+
   // The field is only in the way once a token is stored, so it hides itself then and
   // the ⚿ button brings it back to change or clear it.
   function showTokenField(show, prefill) {
@@ -128,8 +138,20 @@
   function saveToken() {
     if (!tokenInput) return;
     const v = tokenInput.value.trim();
+    // The two keys this project uses look nothing alike, and pasting the wrong one here
+    // costs a confusing round-trip to GitHub for a 401. Catch it before that.
+    if (/^fc-/i.test(v)) {
+      notice(
+        "That looks like the <b>Firecrawl</b> key (<code>fc-…</code>). It belongs in the repo's " +
+          "GitHub secrets, not here — this field wants a <b>GitHub token</b> " +
+          "(<code>github_pat_…</code> or <code>ghp_…</code>) so the page can start the workflow.",
+        true,
+      );
+      return; // leave the field open with the text in it
+    }
     if (v) localStorage.setItem(TOKEN_KEY, v);
     else localStorage.removeItem(TOKEN_KEY); // clearing the field forgets the token
+    notice("");
     showTokenField(!v, false);
     syncButton();
   }
@@ -198,7 +220,10 @@
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem(TOKEN_KEY);
       showTokenField(true, false);
-      throw new Error("token rejected (" + res.status + ") — it was cleared, enter a new one");
+      throw new Error(
+        "GitHub rejected that token (" + res.status + "). It has been cleared. It needs to be a " +
+          "GitHub token with <b>Actions: read and write</b> on this repo — not the Firecrawl key.",
+      );
     }
     if (res.status !== 204) throw new Error("dispatch failed: HTTP " + res.status);
   }
@@ -219,6 +244,7 @@
     polling = true;
     const before = window.__cmUpdatedAt || null;
     try {
+      notice("");
       setBtn("dispatching…", true);
       await dispatch();
       setBtn("scraping…", true, "Cardmarket scrape running");
@@ -239,7 +265,7 @@
       pending = new Set();
       polling = false;
       syncButton();
-      window.alert(String(e.message || e));
+      notice(String(e.message || e), true);
     } finally {
       polling = false;
     }

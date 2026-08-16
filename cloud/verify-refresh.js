@@ -67,14 +67,30 @@ function check(ok, msg) {
   check(await page.locator("#cm-refresh").isDisabled(), "refresh is disabled until a token exists");
   check((await page.getAttribute("#cm-refresh", "title")).toLowerCase().includes("token"), "tooltip explains why");
 
-  console.log("typing a token into the field stores it and arms the button");
-  await page.fill("#cm-token", "test-token-123");
+  console.log("pasting the Firecrawl key by mistake is caught before GitHub sees it");
+  await page.fill("#cm-token", "fc-ea49871110ee4e57a225b3dfbbb1574a");
   await page.press("#cm-token", "Enter");
   await page.waitForTimeout(200);
   check(
-    (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === "test-token-123",
+    (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === null,
+    "the Firecrawl key is not stored as a GitHub token",
+  );
+  check(!(await page.locator("#notice").isHidden()), "an inline notice explains the mix-up");
+  check(
+    (await page.locator("#notice").textContent()).includes("Firecrawl"),
+    "the notice names which key was pasted",
+  );
+  check(await page.locator("#cm-refresh").isDisabled(), "the button stays disabled");
+
+  console.log("typing a token into the field stores it and arms the button");
+  await page.fill("#cm-token", "github_pat_testtoken123");
+  await page.press("#cm-token", "Enter");
+  await page.waitForTimeout(200);
+  check(
+    (await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)) === "github_pat_testtoken123",
     "token saved to localStorage",
   );
+  check(await page.locator("#notice").isHidden(), "the notice clears once a real token is entered");
   check(await page.locator("#cm-token").isHidden(), "field hides itself once a token is set");
   check(await page.locator("#cm-refresh").isEnabled(), "refresh is now armed");
   check((await page.getAttribute("#cm-refresh", "title")).includes("10 of 33"), "tooltip reports the day's credit use");
@@ -93,7 +109,7 @@ function check(ok, msg) {
   check(sent && sent.body.ref === "main", "dispatches against main");
   check(sent && sent.body.inputs && sent.body.inputs.force === "true", "sends force=true so the TTL is ignored");
   check(sent && sent.body.inputs.cards === "", "no ticks = empty card list = the normal rotation");
-  check(sent && sent.headers.authorization === "Bearer test-token-123", "authorises with the token from localStorage");
+  check(sent && sent.headers.authorization === "Bearer github_pat_testtoken123", "authorises with the token from localStorage");
   check((await page.locator("#cm-refresh").textContent()).includes("scraping"), "button reports progress while the run is in flight");
 
   console.log("each card says when it was last scraped");
@@ -124,7 +140,7 @@ function check(ok, msg) {
   await page.close();
 
   console.log("ticking cards narrows the refresh to those cards");
-  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
   const boxes = page.locator("#grid .card .pick");
   const cardCount = await page.locator("#grid .card").count();
   check((await boxes.count()) === cardCount - 1, "every Cardmarket-watched card gets a tick box, including never-scraped ones");
@@ -163,11 +179,11 @@ function check(ok, msg) {
   await page.close();
 
   console.log("the key button reopens the field, and emptying it forgets the token");
-  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
   check(await page.locator("#cm-token").isHidden(), "field starts hidden when a token exists");
   await page.locator("#cm-token-toggle").click();
   check(!(await page.locator("#cm-token").isHidden()), "key button reveals the field");
-  check((await page.inputValue("#cm-token")) === "test-token-123", "field is prefilled so it can be edited");
+  check((await page.inputValue("#cm-token")) === "github_pat_testtoken123", "field is prefilled so it can be edited");
   await page.fill("#cm-token", "");
   await page.press("#cm-token", "Enter");
   await page.waitForTimeout(200);
@@ -181,7 +197,7 @@ function check(ok, msg) {
   console.log("no allowance left -> the button refuses instead of firing a no-op run");
   cm = JSON.parse(JSON.stringify(cm));
   cm.meta.credits = cm.meta.allowance;
-  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
   await page.waitForTimeout(300);
   check(await page.locator("#cm-refresh").isDisabled(), "button is disabled");
   check((await page.locator("#cm-refresh").textContent()).toLowerCase().includes("budget"), "button says the budget is spent");
@@ -200,6 +216,10 @@ function check(ok, msg) {
     "the 401'd token was cleared from localStorage",
   );
   check(!(await page.locator("#cm-token").isHidden()), "the field reopens so a new token can be entered");
+  check(
+    (await page.locator("#notice").textContent()).includes("Actions: read and write"),
+    "the 401 notice says what the token actually needs",
+  );
   await page.close();
 
   await browser.close();
