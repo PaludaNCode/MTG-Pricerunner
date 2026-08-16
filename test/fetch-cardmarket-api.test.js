@@ -140,7 +140,7 @@ test("running out of credits stops the pass instead of retrying every card", asy
     () => [402, { error: "Insufficient credits" }],
     async (mod, seen) => {
       const { results, scraped } = await mod.fetchAll([product(1), product(2), product(3)], {
-        apiKey: "fc-test", now: NOW, ...FAST,
+        apiKey: "fc-test", perRunLimit: 10, now: NOW, ...FAST,
       });
       assert.equal(seen.length, 1, "402 must not be retried, and must not be re-tried per card");
       assert.equal(scraped, 1);
@@ -152,6 +152,21 @@ test("running out of credits stops the pass instead of retrying every card", asy
 
 // Requests split by endpoint — the credit-usage GETs are bookkeeping, not scrapes.
 const scrapesIn = (seen) => seen.filter((s) => s.url === "/v2/scrape");
+const byUrl = (credits, page) => ({ url }) =>
+  url === "/v2/team/credit-usage" ? [200, credits] : [200, { success: true, data: { rawHtml: page } }];
+
+test("the per-run limit caps a single wake, whatever the queue looks like", async () => {
+  await withStub(
+    () => [200, { success: true, data: { rawHtml: PAGE } }],
+    async (mod, seen) => {
+      const { scraped } = await mod.fetchAll([product(1), product(2), product(3), product(4)], {
+        apiKey: "fc-test", perRunLimit: 2, now: NOW, ...FAST,
+      });
+      assert.equal(scraped, 2, "an hourly job must not spend the whole day in one wake");
+      assert.equal(scrapesIn(seen).length, 2);
+    },
+  );
+});
 
 test("when the budget is smaller than the queue, the stalest cards go first", async () => {
   await withStub(
@@ -165,13 +180,17 @@ test("when the budget is smaller than the queue, the stalest cards go first", as
         { site: "cardmarket", productUrl: product(3).productUrl, fetchedAt: at(20), offers: [] },
       ];
       const { scraped, meta } = await mod.fetchAll([product(1), product(2), product(3)], {
-        apiKey: "fc-test", prev, ttlMinutes: 360, dailyBudget: 1, now: NOW, ...FAST,
+        apiKey: "fc-test", prev, ttlMinutes: 360, perRunLimit: 1, now: NOW, ...FAST,
       });
 
       assert.equal(scraped, 1);
-      const urls = scrapesIn(seen).map((s) => s.body.url);
-      assert.deepEqual(urls, [product(2).productUrl], "the 40h-old card should win the only slot");
-      assert.deepEqual(meta, { day: "2026-08-16", scrapes: 1 });
+      assert.deepEqual(
+        scrapesIn(seen).map((s) => s.body.url),
+        [product(2).productUrl],
+        "the 40h-old card should win the only slot",
+      );
+      assert.equal(meta.day, "2026-08-16");
+      assert.equal(meta.scrapes, 1);
     },
   );
 });
@@ -189,7 +208,7 @@ test("a card with no previous result sorts ahead of every dated one", async () =
         },
       ];
       await mod.fetchAll([product(1), product(2)], {
-        apiKey: "fc-test", prev, ttlMinutes: 360, dailyBudget: 1, now: NOW, ...FAST,
+        apiKey: "fc-test", prev, ttlMinutes: 360, perRunLimit: 1, now: NOW, ...FAST,
       });
       assert.deepEqual(
         scrapesIn(seen).map((s) => s.body.url),
@@ -200,50 +219,68 @@ test("a card with no previous result sorts ahead of every dated one", async () =
   );
 });
 
-test("today's spend carries over, so the budget survives across runs", async () => {
+test("the daily credit allowance, not the scrape count, decides how much a run may spend", async () => {
   await withStub(
-    () => [200, { success: true, data: { rawHtml: PAGE } }],
+    // 1000 remaining, no billing period -> 1000/30 = 33.3 credits/day. At the assumed
+    // 5 credits a scrape that affords 6, but 30 are already spent today, leaving 3.3 -> 0.
+    byUrl({ success: true, data: { remainingCredits: 1000 } }, PAGE),
     async (mod, seen) => {
-      const { scraped, meta } = await mod.fetchAll([product(1), product(2), product(3)], {
+      const { scraped } = await mod.fetchAll([product(1), product(2)], {
         apiKey: "fc-test",
-        dailyBudget: 5,
-        meta: { day: "2026-08-16", scrapes: 4 }, // only one slot left today
+        checkCredits: true,
+        perRunLimit: 5,
+        minCredits: 25,
+        monthlyCredits: 1000,
+        meta: { day: "2026-08-16", scrapes: 6, credits: 30 },
         now: NOW,
         ...FAST,
       });
+      assert.equal(scraped, 0, "today's allowance is already spent");
+      assert.equal(scrapesIn(seen).length, 0);
+    },
+  );
+});
+
+test("a measured cost per scrape replaces the pessimistic assumption", async () => {
+  await withStub(
+    byUrl({ success: true, data: { remainingCredits: 1000 } }, PAGE),
+    async (mod, seen) => {
+      // 33.3/day allowance. costPerScrape 1 (measured) affords 33; perRunLimit caps at 4.
+      const { scraped } = await mod.fetchAll([product(1), product(2), product(3), product(4)], {
+        apiKey: "fc-test",
+        checkCredits: true,
+        perRunLimit: 4,
+        monthlyCredits: 1000,
+        meta: { day: "2026-08-16", scrapes: 0, credits: 0, costPerScrape: 1 },
+        now: NOW,
+        ...FAST,
+      });
+      assert.equal(scraped, 4, "a cheap measured cost should unlock more scrapes");
+      assert.equal(scrapesIn(seen).length, 4);
+    },
+  );
+});
+
+test("the credit floor is respected even with budget to spare", async () => {
+  await withStub(
+    byUrl({ success: true, data: { remainingCredits: 30 } }, PAGE),
+    async (mod, seen) => {
+      // 30 remaining - 25 reserve = 5 spendable, at an assumed 5/scrape = exactly 1.
+      const { scraped } = await mod.fetchAll([product(1), product(2), product(3)], {
+        apiKey: "fc-test", checkCredits: true, perRunLimit: 5, minCredits: 25, now: NOW, ...FAST,
+      });
       assert.equal(scraped, 1);
       assert.equal(scrapesIn(seen).length, 1);
-      assert.deepEqual(meta, { day: "2026-08-16", scrapes: 5 });
     },
   );
 });
 
-test("the credit floor caps the run below the daily budget", async () => {
+test("an exhausted balance scrapes nothing and flags no error", async () => {
   await withStub(
-    ({ url }) =>
-      url === "/v2/team/credit-usage"
-        ? [200, { success: true, data: { remainingCredits: 27, planCredits: 500 } }]
-        : [200, { success: true, data: { rawHtml: PAGE } }],
-    async (mod, seen) => {
-      // 27 remaining - 25 reserve = 2 spendable, even though the budget allows 10.
-      const { scraped } = await mod.fetchAll([product(1), product(2), product(3), product(4)], {
-        apiKey: "fc-test", dailyBudget: 10, minCredits: 25, checkCredits: true, now: NOW, ...FAST,
-      });
-      assert.equal(scraped, 2);
-      assert.equal(scrapesIn(seen).length, 2);
-    },
-  );
-});
-
-test("an exhausted balance scrapes nothing at all", async () => {
-  await withStub(
-    ({ url }) =>
-      url === "/v2/team/credit-usage"
-        ? [200, { success: true, data: { remainingCredits: 10 } }]
-        : [200, { success: true, data: { rawHtml: PAGE } }],
+    byUrl({ success: true, data: { remainingCredits: 10 } }, PAGE),
     async (mod, seen) => {
       const { scraped, results } = await mod.fetchAll([product(1)], {
-        apiKey: "fc-test", dailyBudget: 10, minCredits: 25, checkCredits: true, now: NOW, ...FAST,
+        apiKey: "fc-test", checkCredits: true, perRunLimit: 5, minCredits: 25, now: NOW, ...FAST,
       });
       assert.equal(scraped, 0);
       assert.equal(scrapesIn(seen).length, 0);
@@ -252,18 +289,43 @@ test("an exhausted balance scrapes nothing at all", async () => {
   );
 });
 
-test("an unreachable credit endpoint does not block the run", async () => {
+test("an unreadable balance falls back to the coarse scrape counter", async () => {
   await withStub(
     ({ url }) =>
       url === "/v2/team/credit-usage"
         ? [500, { error: "nope" }]
         : [200, { success: true, data: { rawHtml: PAGE } }],
     async (mod, seen) => {
-      const { scraped } = await mod.fetchAll([product(1)], {
-        apiKey: "fc-test", dailyBudget: 10, checkCredits: true, now: NOW, ...FAST,
+      const { scraped } = await mod.fetchAll([product(1), product(2), product(3)], {
+        apiKey: "fc-test",
+        checkCredits: true,
+        perRunLimit: 5,
+        dailyBudget: 4,
+        meta: { day: "2026-08-16", scrapes: 2 }, // 2 of 4 already used
+        now: NOW,
+        ...FAST,
       });
-      assert.equal(scraped, 1);
-      assert.equal(scrapesIn(seen).length, 1);
+      assert.equal(scraped, 2, "a broken endpoint must not mean unlimited spending");
+      assert.equal(scrapesIn(seen).length, 2);
+    },
+  );
+});
+
+test("the run books what it actually spent and learns the cost", async () => {
+  let remaining = 1000;
+  await withStub(
+    ({ url }) => {
+      if (url === "/v2/team/credit-usage") return [200, { success: true, data: { remainingCredits: remaining } }];
+      remaining -= 3; // this account bills 3 credits a scrape
+      return [200, { success: true, data: { rawHtml: PAGE } }];
+    },
+    async (mod) => {
+      const { scraped, meta } = await mod.fetchAll([product(1), product(2)], {
+        apiKey: "fc-test", checkCredits: true, perRunLimit: 2, monthlyCredits: 1000, now: NOW, ...FAST,
+      });
+      assert.equal(scraped, 2);
+      assert.equal(meta.credits, 6, "measured spend, not an estimate");
+      assert.equal(meta.costPerScrape, 3, "first measurement is taken at face value");
     },
   );
 });

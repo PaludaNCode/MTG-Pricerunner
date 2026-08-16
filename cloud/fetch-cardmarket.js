@@ -5,18 +5,23 @@
 // a real signed-in Chrome over CDP — impossible in Actions. Firecrawl renders the page
 // on its own (optionally stealth-proxied) infrastructure and hands back the HTML.
 //
-// Credits are the binding constraint, not rate limits: the data workflow runs every
-// couple of minutes, and one scrape per card per run would burn a plan in an hour.
-// Three independent brakes, weakest to strongest:
+// Credits are the binding constraint, not rate limits. The budget is denominated in
+// **credits, not scrapes**, because the cost of a scrape isn't knowable up front:
+// `proxy: "auto"` silently escalates to the stealth proxy when Cloudflare bites, which
+// bills several credits instead of one. A scrape-counted budget would therefore either
+// under-spend the plan by ~5x or overrun it by ~5x, depending on which way we guessed.
 //
-//   1. TTL          — a result younger than `cardmarketTtlMinutes` is reused, not re-fetched.
-//   2. Daily budget — at most `cardmarketDailyBudget` scrapes per UTC day, whatever the TTL
-//                     says. When more cards are due than budget remains, the *stalest* ones
-//                     go first, so the allowance rotates instead of always feeding the top
-//                     of config.json.
-//   3. Credit floor — the live balance is read before scraping and the pass stops while
-//                     `cardmarketMinCredits` are still in the account, so an unattended
-//                     workflow can never zero the plan out.
+// So: measure the balance before and after each pass, learn the real cost per scrape,
+// and spend against a daily credit allowance derived from the live balance and the days
+// left in the billing period. Under-spending one day raises tomorrow's allowance;
+// overspending lowers it. Brakes, weakest to strongest:
+//
+//   1. TTL           — a result younger than `cardmarketTtlMinutes` is reused, not re-fetched.
+//   2. Per-run limit — at most `cardmarketPerRunLimit` scrapes per wake, so an hourly job
+//                      can't spend the whole day's allowance in its first run.
+//   3. Credit/day    — remaining balance ÷ days left in the period, minus what today
+//                      already cost. This is the real ceiling.
+//   4. Credit floor  — never spend below `cardmarketMinCredits`, so the plan can't be zeroed.
 const { parseCardmarket, looksBlocked } = require("./cardmarket-parse");
 
 // FIRECRAWL_API_URL matches the official SDK's env var; the tests point it at a stub.
@@ -24,8 +29,13 @@ const BASE = (process.env.FIRECRAWL_API_URL || "https://api.firecrawl.dev").repl
 const API = BASE + "/v2/scrape";
 const CREDITS_API = BASE + "/v2/team/credit-usage";
 const DEFAULT_TTL_MINUTES = 360;
-const DEFAULT_DAILY_BUDGET = 12;
+const DEFAULT_DAILY_BUDGET = 12; // fallback cap when the balance can't be read
 const DEFAULT_MIN_CREDITS = 25;
+const DEFAULT_PER_RUN_LIMIT = 2;
+const DEFAULT_MONTHLY_CREDITS = 1000; // used only when the API reports no billing period
+// Assume the expensive case until a run measures otherwise: guessing low burns the plan,
+// guessing high only means a slower first day.
+const ASSUMED_COST_PER_SCRAPE = 5;
 const WAIT_MS = 1000; // pace between cards
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -44,11 +54,47 @@ function isFresh(prev, ttlMinutes, now) {
 // against today, and a mismatch means the tally starts at zero.
 const utcDay = (now) => new Date(now).toISOString().slice(0, 10);
 
-// How many scrapes are still allowed today, given the meta carried over in data.json.
+// How many scrapes are still allowed today by the fallback scrape counter. Only used
+// when the balance can't be read; the credit allowance below is the real control.
 function budgetLeft(meta, dailyBudget, now) {
   if (!(dailyBudget > 0)) return 0;
   const used = meta && meta.day === utcDay(now) ? meta.scrapes || 0 : 0;
   return Math.max(0, dailyBudget - used);
+}
+
+// Credits already spent today (measured, not estimated), from the carried-over meta.
+const creditsUsedToday = (meta, now) =>
+  meta && meta.day === utcDay(now) ? meta.credits || 0 : 0;
+
+// Whole days left in the billing period, including today. Falls back to a 30-day month
+// when the plan reports no period (one-time credits), so the allowance still paces out.
+function daysLeftInPeriod(periodEnd, now) {
+  if (!periodEnd) return null;
+  const end = Date.parse(periodEnd);
+  if (!Number.isFinite(end) || end <= now) return null;
+  return Math.max(1, Math.ceil((end - now) / 86400000));
+}
+
+// The self-correcting daily allowance: spendable balance ÷ days left. Recomputed every
+// run, so a quiet day lifts tomorrow's ceiling and a heavy one lowers it — no drift, and
+// no need to know the plan size.
+function dailyCreditAllowance(credits, { minCredits, monthlyCredits, now }) {
+  if (!credits) return null;
+  const spendable = Math.max(0, credits.remaining - minCredits);
+  const days = daysLeftInPeriod(credits.periodEnd, now);
+  if (days) return spendable / days;
+  // No billing period reported: pace the configured monthly figure over 30 days, but
+  // never promise more than the balance actually holds.
+  return Math.min(spendable, monthlyCredits / 30);
+}
+
+// Cost per scrape, learned from measured deltas and carried in meta. Smoothed so one
+// odd run (a cheap cached hit, a retry storm) doesn't swing the budget.
+function learnCost(previous, spent, scrapes) {
+  if (!(scrapes > 0) || !(spent > 0)) return previous || null;
+  const observed = spent / scrapes;
+  if (!previous) return observed;
+  return previous * 0.7 + observed * 0.3;
 }
 
 // Stalest first, never-fetched before everything: this is what makes a budget smaller
@@ -126,8 +172,8 @@ async function scrapeHtml(url, { apiKey, country, retryBackoffMs = 3000 }) {
   throw new Error(last || "scrape failed");
 }
 
-// products: normalized cardmarket products; prev: results array from the last data.json.
-// Returns { results, scraped } — `scraped` is the Firecrawl call count (≈ credits spent).
+// products: normalized cardmarket products; prev: the last run's results array.
+// Returns { results, scraped, meta } — meta is the bookkeeping the next run needs.
 async function fetchAll(products, opts = {}) {
   const {
     apiKey,
@@ -141,6 +187,8 @@ async function fetchAll(products, opts = {}) {
     paceMs = WAIT_MS,
     dailyBudget = DEFAULT_DAILY_BUDGET,
     minCredits = DEFAULT_MIN_CREDITS,
+    perRunLimit = DEFAULT_PER_RUN_LIMIT,
+    monthlyCredits = DEFAULT_MONTHLY_CREDITS,
     meta = null,
     checkCredits = false,
   } = opts;
@@ -148,30 +196,41 @@ async function fetchAll(products, opts = {}) {
   const prevByUrl = new Map();
   for (const r of prev) if (r && r.site === "cardmarket" && r.productUrl) prevByUrl.set(r.productUrl, r);
 
-  // Pick this run's scrape set up front: everything past its TTL, stalest first, capped
-  // by what's left of today's budget.
-  let allowance = budgetLeft(meta, dailyBudget, now);
+  // Everything past its TTL, stalest first.
   const due = products
     .filter((p) => !isFresh(prevByUrl.get(p.productUrl), ttlMinutes, now))
     .sort((a, b) => staleness(prevByUrl.get(a.productUrl)) - staleness(prevByUrl.get(b.productUrl)));
 
+  // How many of them this run may actually pay for.
+  let allowance = Math.max(0, perRunLimit);
   let credits = null;
-  if (checkCredits && due.length && allowance > 0) {
-    credits = await getCredits(apiKey);
-    if (credits) {
-      const spendable = Math.max(0, credits.remaining - minCredits);
-      log(`Firecrawl: ${credits.remaining} credits remaining${credits.plan ? " of " + credits.plan : ""}` +
+  const costPerScrape = (meta && meta.costPerScrape) || ASSUMED_COST_PER_SCRAPE;
+
+  if (checkCredits && due.length && allowance > 0) credits = await getCredits(apiKey);
+
+  if (credits) {
+    const perDay = dailyCreditAllowance(credits, { minCredits, monthlyCredits, now });
+    const spentToday = creditsUsedToday(meta, now);
+    const creditsLeftToday = Math.max(0, perDay - spentToday);
+    const affordable = Math.floor(creditsLeftToday / costPerScrape);
+    log(
+      `Firecrawl: ${credits.remaining} credits${credits.plan ? "/" + credits.plan : ""}` +
         (credits.periodEnd ? `, period ends ${String(credits.periodEnd).slice(0, 10)}` : "") +
-        `; reserve ${minCredits}`);
-      if (spendable < allowance) allowance = spendable;
-    }
+        ` · ${perDay.toFixed(1)}/day allowance, ${spentToday} spent today` +
+        ` · ~${costPerScrape.toFixed(1)} credits/scrape${meta && meta.costPerScrape ? " (measured)" : " (assumed)"}` +
+        ` → ${affordable} affordable`,
+    );
+    allowance = Math.min(allowance, affordable);
+  } else if (checkCredits) {
+    // Balance unreadable: fall back to the coarse scrape counter so a broken endpoint
+    // can't turn into unlimited spending.
+    allowance = Math.min(allowance, budgetLeft(meta, dailyBudget, now));
   }
 
   const scrapeSet = new Set(due.slice(0, allowance).map((p) => p.productUrl));
   const deferred = due.length - scrapeSet.size;
   if (deferred > 0) {
-    log(`budget: ${scrapeSet.size} of ${due.length} due card(s) this run, ${deferred} deferred ` +
-      `(${dailyBudget}/day, ${budgetLeft(meta, dailyBudget, now)} left before this run)`);
+    log(`budget: scraping ${scrapeSet.size} of ${due.length} due card(s), ${deferred} deferred to a later run`);
   }
 
   const results = [];
@@ -219,22 +278,33 @@ async function fetchAll(products, opts = {}) {
     if (i < products.length - 1) await sleep(paceMs);
   }
 
-  // Measured cost per scrape — the only trustworthy number, since a Cloudflare-triggered
-  // stealth retry bills more than a plain fetch and neither side reports it per request.
+  // Close the loop: re-read the balance, book what the pass actually cost against today,
+  // and update the learned cost per scrape. This is the only trustworthy cost signal —
+  // a stealth escalation bills more than a plain fetch and nothing reports it per request.
+  let spent = 0;
+  let learnedCost = (meta && meta.costPerScrape) || null;
   if (credits && scraped) {
     const after = await getCredits(apiKey);
     if (after) {
-      const spent = credits.remaining - after.remaining;
-      log(`Firecrawl: spent ${spent} credit(s) on ${scraped} scrape(s) ` +
-        `(${(spent / scraped).toFixed(1)}/scrape), ${after.remaining} remaining`);
+      spent = Math.max(0, credits.remaining - after.remaining);
+      learnedCost = learnCost(learnedCost, spent, scraped);
+      log(
+        `Firecrawl: spent ${spent} credit(s) on ${scraped} scrape(s) ` +
+          `(${(spent / scraped).toFixed(1)}/scrape), ${after.remaining} remaining`,
+      );
     }
   }
 
-  const usedBefore = meta && meta.day === utcDay(now) ? meta.scrapes || 0 : 0;
+  const sameDay = meta && meta.day === utcDay(now);
   return {
     results,
     scraped,
-    meta: { day: utcDay(now), scrapes: usedBefore + scraped },
+    meta: {
+      day: utcDay(now),
+      scrapes: (sameDay ? meta.scrapes || 0 : 0) + scraped,
+      credits: (sameDay ? meta.credits || 0 : 0) + spent,
+      ...(learnedCost ? { costPerScrape: Number(learnedCost.toFixed(2)) } : {}),
+    },
   };
 }
 
@@ -258,7 +328,13 @@ module.exports = {
   budgetLeft,
   utcDay,
   getCredits,
+  daysLeftInPeriod,
+  dailyCreditAllowance,
+  learnCost,
+  creditsUsedToday,
   DEFAULT_TTL_MINUTES,
   DEFAULT_DAILY_BUDGET,
   DEFAULT_MIN_CREDITS,
+  DEFAULT_PER_RUN_LIMIT,
+  DEFAULT_MONTHLY_CREDITS,
 };

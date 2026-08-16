@@ -14,9 +14,16 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css
 for (const f of ["ui.css", "render.js", "app.js", "favicon.svg"]) {
   fs.copyFileSync(path.join(SHARED, f), path.join(WEB, f));
 }
-if (!fs.existsSync(path.join(WEB, "data.json"))) {
-  fs.copyFileSync(path.join(__dirname, "fixture-data.json"), path.join(WEB, "data.json"));
-  console.log("no live data.json — using fixture-data.json");
+// Both feeds get a fixture fallback: the page merges CardTrader and Cardmarket, and the
+// smoke test should exercise that merge (it is what puts the Src column on screen).
+for (const [live, fixture] of [
+  ["data.json", "fixture-data.json"],
+  ["cardmarket.json", "fixture-cardmarket.json"],
+]) {
+  if (!fs.existsSync(path.join(WEB, live))) {
+    fs.copyFileSync(path.join(__dirname, fixture), path.join(WEB, live));
+    console.log(`no live ${live} — using ${fixture}`);
+  }
 }
 
 const server = http.createServer((req, res) => {

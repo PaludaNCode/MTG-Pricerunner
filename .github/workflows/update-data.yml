@@ -10,8 +10,6 @@ on:
       - "config.json"
       - "cloud/build-data.js"
       - "cloud/fetch-cardtrader.js"
-      - "cloud/fetch-cardmarket.js"
-      - "cloud/cardmarket-parse.js"
       - "shared/cards.js"
       - ".github/workflows/update-data.yml"
 
@@ -35,24 +33,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      # The previous data.json feeds the Cardmarket TTL: results younger than
-      # config.cardmarketTtlMinutes are reused instead of costing a Firecrawl credit.
-      # Read straight off the data branch (not raw.githubusercontent) so a CDN-stale
-      # copy can't trigger a needless re-scrape. First ever run has no data branch.
-      - name: Pull the previous data.json (for the Cardmarket TTL)
-        run: |
-          if git fetch --depth=1 origin data 2>/dev/null &&
-             git show FETCH_HEAD:data.json > /tmp/prev-data.json 2>/dev/null; then
-            echo "previous data.json: $(wc -c < /tmp/prev-data.json) bytes"
-          else
-            rm -f /tmp/prev-data.json
-            echo "no previous data.json — every Cardmarket card will be scraped"
-          fi
-      - name: Fetch card data -> cloud/web/data.json
-        run: node cloud/build-data.js --prev /tmp/prev-data.json
+      # CardTrader only, and stateless by design: nothing is carried between runs, so
+      # a failed run costs nothing but a stale minute. Cardmarket has its own workflow.
+      - name: Fetch CardTrader data -> cloud/web/data.json
+        run: node cloud/build-data.js
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
-          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       # The data branch is a build artifact: a single orphan commit, force-pushed
       # every run so history never grows. Never branch from it or PR into it.
       - name: Publish data.json to the data branch

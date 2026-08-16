@@ -2,7 +2,15 @@
 // a wrong answer here either burns the quota or freezes prices on the page.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { isFresh, budgetLeft, utcDay } = require("../cloud/fetch-cardmarket");
+const {
+  isFresh,
+  budgetLeft,
+  utcDay,
+  daysLeftInPeriod,
+  dailyCreditAllowance,
+  learnCost,
+  creditsUsedToday,
+} = require("../cloud/fetch-cardmarket");
 
 const NOW = Date.parse("2026-08-16T12:00:00.000Z");
 const ago = (minutes) => ({ fetchedAt: new Date(NOW - minutes * 60000).toISOString() });
@@ -43,4 +51,44 @@ test("the daily budget counts down and resets on the UTC day boundary", () => {
 test("a zero or missing daily budget stops all scraping", () => {
   assert.equal(budgetLeft({ day: utcDay(NOW), scrapes: 0 }, 0, NOW), 0);
   assert.equal(budgetLeft(null, undefined, NOW), 0);
+});
+
+test("the daily allowance divides the spendable balance over the days left", () => {
+  const in10Days = new Date(NOW + 10 * 86400000).toISOString();
+  const opts = { minCredits: 25, monthlyCredits: 1000, now: NOW };
+
+  // (525 - 25 reserve) / 10 days = 50 a day.
+  assert.equal(dailyCreditAllowance({ remaining: 525, periodEnd: in10Days }, opts), 50);
+  // Spending less today lifts the figure tomorrow; spending more lowers it. Self-correcting.
+  assert.equal(dailyCreditAllowance({ remaining: 1025, periodEnd: in10Days }, opts), 100);
+  // Never promise credits that are inside the reserve.
+  assert.equal(dailyCreditAllowance({ remaining: 20, periodEnd: in10Days }, opts), 0);
+});
+
+test("with no billing period the allowance paces the configured monthly figure", () => {
+  const opts = { minCredits: 25, monthlyCredits: 1000, now: NOW };
+  assert.equal(dailyCreditAllowance({ remaining: 900, periodEnd: null }, opts), 1000 / 30);
+  // …but still never more than the balance actually holds.
+  assert.equal(dailyCreditAllowance({ remaining: 30, periodEnd: null }, opts), 5);
+  assert.equal(dailyCreditAllowance(null, opts), null);
+});
+
+test("a period end in the past or unparseable falls back to monthly pacing", () => {
+  assert.equal(daysLeftInPeriod(null, NOW), null);
+  assert.equal(daysLeftInPeriod("nonsense", NOW), null);
+  assert.equal(daysLeftInPeriod(new Date(NOW - 86400000).toISOString(), NOW), null);
+  assert.equal(daysLeftInPeriod(new Date(NOW + 3 * 86400000).toISOString(), NOW), 3);
+});
+
+test("cost per scrape is smoothed, so one odd run can't swing the budget", () => {
+  assert.equal(learnCost(null, 10, 2), 5); // first measurement taken as-is
+  assert.equal(learnCost(5, 5, 5), 5 * 0.7 + 1 * 0.3); // drifts toward the new observation
+  assert.equal(learnCost(5, 0, 2), 5, "a zero-cost run (cached hits) is ignored");
+  assert.equal(learnCost(5, 10, 0), 5, "no scrapes means nothing to learn");
+});
+
+test("credits spent today reset with the UTC day", () => {
+  assert.equal(creditsUsedToday({ day: "2026-08-16", credits: 12 }, NOW), 12);
+  assert.equal(creditsUsedToday({ day: "2026-08-15", credits: 12 }, NOW), 0);
+  assert.equal(creditsUsedToday(null, NOW), 0);
 });

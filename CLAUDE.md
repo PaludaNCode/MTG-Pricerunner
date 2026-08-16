@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MTG card price watcher (Japanese printings) on GitHub Pages at
 https://paludancode.github.io/MTG-Pricerunner/. Two sources: CardTrader (official API) and
-Cardmarket (scraped via Firecrawl). Two decoupled workflows:
+Cardmarket (scraped via Firecrawl). **Three** decoupled workflows, and the page merges two
+independent feeds:
 
 - `.github/workflows/update.yml` ("Deploy site") publishes to Pages **only on push to `main`** (UI/source changes).
+- `.github/workflows/update-cardmarket.yml` ("Update Cardmarket data") runs hourly (`17 * * * *`) and force-pushes `cardmarket.json` as a single orphan commit to the **`data-cm` branch**. Separate from the data workflow on purpose — see the Cardmarket section. Hourly is a *ceiling*: the fetcher decides per wake how many cards the credit allowance can afford, and most wakes scrape nothing. `concurrency.cancel-in-progress` is deliberately **false** here (unlike the data workflow): a cancelled run may have spent credits without recording them.
 - `.github/workflows/update-data.yml` ("Update card data") runs on a `2-57/5` cron (GitHub best-effort; empirically fires every few hours, not every 5 min) and force-pushes `data.json` as a **single orphan commit to the `data` branch**. The Pages-hosted page fetches it from `raw.githubusercontent.com/.../data/data.json` — fresh data needs no deploy. The `data` branch is a build artifact: never branch from it or PR into it. In practice the cadence comes from a live cron-job.org pinger hitting the workflow's `workflow_dispatch` endpoint every 2 min — see `docs/external-pinger.md`; the in-repo cron is only a fallback.
 
 (A local Node watcher used to live in `local/`; it was removed in 03c49ae — see git
@@ -23,10 +25,13 @@ cloud pipeline, via Firecrawl.)
 # Uses cloud/web/data.json if present, else cloud/fixture-data.json.
 node cloud/verify-mobile.js
 
-# Build cloud data locally. CARDTRADER_TOKEN is required; without FIRECRAWL_API_KEY
-# the Cardmarket cards are skipped (CardTrader still builds). --prev is optional and
-# only matters for the Cardmarket TTL — see below.
-CARDTRADER_TOKEN=... FIRECRAWL_API_KEY=... node cloud/build-data.js [--prev old-data.json]
+# Build the CardTrader feed locally (cloud/web/data.json)
+CARDTRADER_TOKEN=... node cloud/build-data.js
+
+# Build the Cardmarket feed locally (cloud/web/cardmarket.json). SPENDS REAL CREDITS.
+# --prev is the previous cardmarket.json: without it the budget ledger restarts and
+# every card looks stale, so always pass it if you have one.
+FIRECRAWL_API_KEY=... node cloud/build-cardmarket.js [--prev old-cardmarket.json]
 
 # Unit tests (node:test, zero deps) — config normalization
 npm test
@@ -47,24 +52,24 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 ## Architecture
 
 - `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid.
-- `shared/app.js` — page bootstrap (fetch loop, status line). The page configures it with `window.DASH = { url, intervalMs }`. The `url` is hostname-conditional: the raw `data`-branch URL on `github.io`, relative `data.json` on localhost (keeps `verify-mobile.js` offline).
+- `shared/app.js` — page bootstrap (fetch loop, status line). The page configures it with `window.DASH = { url, cmUrl, intervalMs }` and app.js **merges the two feeds** into one `results` array before rendering. Both URLs are hostname-conditional: raw `data`/`data-cm` branch URLs on `github.io`, relative paths on localhost (keeps `verify-mobile.js` offline). The Cardmarket fetch is wrapped in a `.catch(() => null)` — the `data-cm` branch may not exist yet, and a failed scrape must never take the page down. The status line shows CardTrader's timestamp plus a `CM <age>` suffix, because the Cardmarket snapshot legitimately lags by hours.
 - `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact, Set column shows the official set code instead of the full variant name).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). The fetchers consume it.
-- `cloud/build-data.js` — **the entry point.** Splits the normalized products by `site`, runs each fetcher, and writes the merged `cloud/web/data.json` in config order. `cloud/fetch-cardtrader.js` and `cloud/fetch-cardmarket.js` are modules (`fetchAll(products, opts)`), not scripts — don't run them directly.
+- **Two entry points, one per source.** `cloud/build-data.js` (CardTrader → `cloud/web/data.json`, stateless) and `cloud/build-cardmarket.js` (Cardmarket → `cloud/web/cardmarket.json`, carries the credit ledger). `cloud/fetch-cardtrader.js` and `cloud/fetch-cardmarket.js` are modules (`fetchAll(products, opts)`), not scripts — don't run them directly. Don't merge the two entry points back together: one writer per file is what keeps the 2-min job from clobbering the hourly job's ledger.
 - `cloud/cardmarket-parse.js` — pure HTML → offers (regex over `id="articleRow<N>"` blocks) plus `looksBlocked()`. Kept separate from the fetcher so it is unit-testable with no network.
 - The deploy workflow `cp`s `shared/` files into `cloud/web/`. Copies inside `cloud/web/` (`ui.css`, `render.js`, `app.js`, `data.json`) are build artifacts and gitignored.
 
-Data shape contract (produced by `cloud/build-data.js`, consumed by `render.js`): `{ updatedAt, results: [{ site, group, variant, code, productUrl, error?, fetchedAt?, offers: [{ price, priceStr, foil, condition, qty, seller, shipsToMe }] }] }`. `site` is `"cardtrader"` or `"cardmarket"` and drives the `Src` column (CT/CM); `fetchedAt` is set on Cardmarket results only and drives the TTL. Offers are merged per `group` and sorted by price client-side. `code` is the official Scryfall set code from `config.json`, shown instead of `variant` on phones; `render.js` falls back to `variant` when it's missing (data.json predating the field).
+Data shape contract (both feeds, consumed by `render.js` after app.js concatenates their `results`): `{ updatedAt, meta?, results: [{ site, group, variant, code, productUrl, error?, fetchedAt?, offers: [{ price, priceStr, foil, condition, qty, seller, shipsToMe }] }] }`. `site` is `"cardtrader"` or `"cardmarket"` and drives the `Src` column (CT/CM); `fetchedAt` is set on Cardmarket results only and drives the TTL. `meta` appears only in `cardmarket.json` and is bookkeeping (`{ day, scrapes, credits, costPerScrape }`) — `render.js` ignores it. Offers are merged per `group` and sorted by price client-side. `code` is the official Scryfall set code from `config.json`, shown instead of `variant` on phones; `render.js` falls back to `variant` when it's missing (data.json predating the field).
 
 ## Cardmarket / Firecrawl
 
 - **Cloudflare is why Firecrawl exists here.** Cardmarket 403s plain fetches from a datacentre IP. The old local watcher drove a signed-in Chrome over CDP; that's impossible in Actions, so `fetch-cardmarket.js` POSTs `api.firecrawl.dev/v2/scrape` (key in the `FIRECRAWL_API_KEY` repo secret) and parses the HTML it returns. Request must stay `formats: ["rawHtml"]` (the cleaned `html` format drops the ids/classes the parser matches), `onlyMainContent: false`, `maxAge: 0` (v2 otherwise serves a cached page — fatal for prices) and `proxy: "auto"` (falls back to the stealth proxy when Cloudflare bites).
-- **Credits, not rate limits, are the constraint.** The workflow runs every ~2 min; one scrape per card per run would drain a plan in hours. Three brakes, weakest to strongest: `cardmarketTtlMinutes` (don't re-scrape a result younger than this, default 360), `cardmarketDailyBudget` (hard cap per UTC day, default 12), `cardmarketMinCredits` (stop while this many credits remain, default 25, checked against the live `/v2/team/credit-usage` balance). The TTL is the ambition, the daily budget is the ceiling.
-- **Deferral is stalest-first, and that matters.** When more cards are due than budget remains, `fetchAll` sorts the due list by `fetchedAt` ascending (never-fetched first) and takes the top N. Without that the first cards in `config.json` would eat the whole allowance every day and the tail would never refresh. A deferred card carries its old offers forward with **no** `error` field — it isn't a fault.
-- **The daily tally lives in `data.json` under `meta.cardmarket` (`{ day, scrapes }`)** and round-trips via `--prev`; it resets when the UTC day changes. `render.js` ignores `meta`. Don't count `fetchedAt`s to reconstruct it — failed scrapes cost credits without updating any timestamp, so a counter is the only honest tally.
-- **The previous file comes off the `data` branch** (`git show FETCH_HEAD:data.json`, not raw.githubusercontent — a CDN-stale copy would cause needless re-scrapes) and is passed as `--prev`.
-- **Per-scrape cost is measured, not assumed.** `proxy: "auto"` silently escalates to the stealth proxy on Cloudflare, which bills more than a basic fetch, and nothing reports that per request. The run brackets the pass with credit-usage reads and logs the delta — read that line before tuning the budget.
-- **A blocked scrape looks like a successful one.** Cloudflare's interstitial is a 200 with a plausible body, so "0 offers" can't distinguish it from an out-of-stock card — hence `looksBlocked()`. On any failure the previous offers are carried forward with the *old* `fetchedAt`, so the card keeps its prices and the next run retries instead of treating the failure as fresh.
+- **The budget is in credits, not scrapes, and that is not incidental.** `proxy: "auto"` escalates to the stealth proxy silently, and stealth bills several credits instead of one. A scrape-counted budget would therefore under-spend the plan by ~5x or overrun it by ~5x depending on which way we guessed. Instead: read the balance, spend against `(remaining − cardmarketMinCredits) ÷ days left in period`, re-read the balance, book the measured delta, and smooth it into `meta.costPerScrape`. Don't "simplify" this back to counting scrapes.
+- **The ledger lives in `cardmarket.json` under `meta`** (`{ day, scrapes, credits, costPerScrape }`) and round-trips via `--prev` off the `data-cm` branch; the day fields reset on the UTC boundary. Losing `--prev` restarts the day's allowance *and* makes every card look stale — that is a credit-burn event, which is precisely why Cardmarket got its own file and its own workflow instead of riding along in the 2-min job's `data.json`.
+- **Deferral is stalest-first, and that matters.** When more cards are due than the allowance covers, `fetchAll` sorts the due list by `fetchedAt` ascending (never-fetched first) and takes the top N. Without that the first cards in `config.json` would eat the allowance every day and the tail would never refresh. A deferred card carries its old offers forward with **no** `error` field — it isn't a fault.
+- **Don't count `fetchedAt`s to reconstruct spend.** A failed scrape costs a credit without updating any timestamp, so the explicit counter is the only honest tally.
+- **`cardmarketTtlMinutes` is deliberately low (120).** It exists to stop pointless re-scrapes, not to pace spending — the credit allowance does that. Raising the TTL just leaves credits unspent.
+- **A blocked scrape looks like a successful one.** Cloudflare's interstitial is a 200 with a plausible body, so "0 offers" can't distinguish it from an out-of-stock card — hence `looksBlocked()`. On any failure the previous offers are carried forward with the *old* `fetchedAt`, so the card keeps its prices and the next run retries.
 - **Cardmarket language filtering is URL-only** (`?language=7` = Japanese); the offer HTML doesn't expose it, so `offer.language` is always null there. A config test enforces the query parameter.
 - `shipsToMe` is always null (renders `?`) for Cardmarket: it's only knowable when logged in, and the scrape is a guest session.
 

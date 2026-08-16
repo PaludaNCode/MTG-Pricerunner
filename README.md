@@ -15,18 +15,21 @@ price-sorted table per card; the `Src` column says which site a row came from.
 ```
 config.json          card watch list (paste-a-URL entries)
 shared/              UI for the dashboard: ui.css, render.js, app.js
-cloud/               GitHub Actions fetcher + static site (cloud/web)
-  build-data.js        entry point — runs every source, writes data.json
+cloud/               GitHub Actions fetchers + static site (cloud/web)
+  build-data.js        entry point A — CardTrader -> data.json (every ~2 min)
+  build-cardmarket.js  entry point B — Cardmarket -> cardmarket.json (hourly)
   fetch-cardtrader.js  CardTrader offers from its official API
-  fetch-cardmarket.js  Cardmarket offers, scraped through Firecrawl
+  fetch-cardmarket.js  Cardmarket offers via Firecrawl + the credit budget
   cardmarket-parse.js  Cardmarket HTML -> offers (pure, unit-tested)
   verify-mobile.js     UI smoke test (renders at 320/390/1440 px, fails on overflow)
-  fixture-data.json    offline test data for CI
+  fixture-data.json    offline CardTrader test data for CI
+  fixture-cardmarket.json  offline Cardmarket test data for CI
 test/                unit tests (node:test, zero deps) — run with `npm test`
 docs/                external-pinger.md — the cron-job.org pinger behind the ~2-min data refresh
 .github/workflows/
   update.yml           CD — deploy the site to Pages (push to main only)
-  update-data.yml      data refresh — cron + dispatch, publishes data.json to the `data` branch
+  update-data.yml      CardTrader refresh — every ~2 min, publishes data.json to `data`
+  update-cardmarket.yml  Cardmarket refresh — hourly, publishes cardmarket.json to `data-cm`
   ci.yml               CI — syntax check + unit tests + UI smoke test (pull requests)
 ```
 
@@ -39,10 +42,20 @@ Site deploys and data refreshes are decoupled:
 
 - **`update.yml`** publishes the site to GitHub Pages, only when UI/source files
   change on `main`. It never touches prices.
-- **`update-data.yml`** fetches prices and force-pushes `data.json` as a single
-  orphan commit to the **`data` branch**. The live page fetches it from
-  `raw.githubusercontent.com`, so fresh data needs no deploy. The `data` branch is
-  a build artifact — never branch from it or PR into it.
+- **`update-data.yml`** fetches CardTrader prices and force-pushes `data.json` as a
+  single orphan commit to the **`data` branch**.
+- **`update-cardmarket.yml`** scrapes Cardmarket and force-pushes `cardmarket.json`
+  to the **`data-cm` branch**, hourly at most.
+
+The live page fetches both from `raw.githubusercontent.com` and merges them, so fresh
+data needs no deploy. Both branches are build artifacts — never branch from them or PR
+into them.
+
+The two are split because they have nothing in common operationally: CardTrader is a
+free API call that can run every couple of minutes and carries no state, while
+Cardmarket is metered scraping with a credit ledger that must survive between runs.
+One writer per file means the 2-min job can never disturb Cardmarket's budget
+accounting — and a lost ledger costs real money.
 
 In practice the refresh cadence comes from an **external pinger**: a cron-job.org
 job POSTs the workflow's `workflow_dispatch` endpoint every 2 minutes (setup and
@@ -53,44 +66,55 @@ so it only serves as a fallback if the pinger dies. Pushes to `main` that touch
 
 ## Cardmarket and Firecrawl credits
 
-Cardmarket sits behind Cloudflare, which blocks plain fetches from a GitHub runner,
-so those pages are scraped through [Firecrawl](https://firecrawl.dev). That costs a
-credit per scrape, and the data workflow runs every couple of minutes — scraping
-every card every run would drain a plan within hours.
+Cardmarket sits behind Cloudflare, which blocks plain fetches from a GitHub runner, so
+those pages are scraped through [Firecrawl](https://firecrawl.dev). Firecrawl bills
+credits per scrape, and — this is the awkward part — **the cost per page is not knowable
+up front**: `proxy: "auto"` silently escalates to the stealth proxy when Cloudflare
+bites, which bills several credits instead of one.
 
-Three knobs in `config.json` bound the spend, weakest to strongest:
+So the budget is denominated in **credits, not scrapes**. Each run reads the live
+balance, spends against a daily allowance, then re-reads the balance and books what the
+pass actually cost:
+
+```
+Firecrawl: 964/1000 credits, period ends 2026-09-01 · 33.1/day allowance, 6 spent today
+           · ~3.0 credits/scrape (measured) → 9 affordable
+Firecrawl: spent 6 credit(s) on 2 scrape(s) (3.0/scrape), 958 remaining
+```
+
+The daily allowance is `(remaining − reserve) ÷ days left in the billing period`, so it
+self-corrects: a quiet day raises tomorrow's ceiling, a heavy one lowers it. The
+measured cost per scrape is smoothed and carried in `cardmarket.json` under `meta`,
+alongside today's spend — which is why `--prev` matters and why only one workflow writes
+that file.
 
 | Knob | Default | What it does |
 |---|---|---|
-| `cardmarketTtlMinutes` | 360 | Don't re-scrape a card whose last result is younger than this. |
-| `cardmarketDailyBudget` | 12 | Hard cap on scrapes per UTC day, whatever the TTL says. |
-| `cardmarketMinCredits` | 25 | Stop while this many credits are still in the account. |
+| `cardmarketMonthlyCredits` | 1000 | Plan size. Only used to pace things when the API reports no billing period. |
+| `cardmarketMinCredits` | 50 | Untouchable reserve — never spend below this. |
+| `cardmarketPerRunLimit` | 2 | Max scrapes per hourly wake, so one run can't eat the day. |
+| `cardmarketTtlMinutes` | 120 | Don't re-scrape a card younger than this. |
+| `cardmarketDailyBudget` | 6 | Fallback scrape cap, used only when the balance can't be read. |
 
-The TTL sets the *ambition* (`cards × 1440 / ttlMinutes` refreshes a day — 20 for 5
-cards at 360 min); the daily budget is the actual ceiling. When more cards are due
-than budget remains, the **stalest** ones go first, so a budget smaller than the
-queue rotates through the list instead of always refreshing the top of
-`config.json`. The tally lives in `data.json` under `meta.cardmarket` and resets at
-00:00 UTC; `build-data.js --prev` is what carries it between runs.
+The TTL is deliberately low: at 2 hours the **credit allowance**, not the TTL, is what
+limits refreshes, so the plan gets spent on whatever is stalest rather than idling.
+Hourly is the cron's ceiling; most wakes will scrape nothing.
 
-Before scraping, the run reads the live balance from `/v2/team/credit-usage` and
-logs what it actually spent:
+**What 1000 credits/month actually buys**, across all Cardmarket cards:
 
-```
-Firecrawl: 431 credits remaining of 500; reserve 25
-Firecrawl: spent 10 credit(s) on 2 scrape(s) (5.0/scrape), 421 remaining
-```
+| Measured cost | Loads/day | With 5 cards, each refreshes |
+|---|---|---|
+| 1 credit (basic proxy) | ~32 | every ~4 hours |
+| 3 credits | ~11 | every ~11 hours |
+| 5 credits (stealth) | ~6 | every ~20 hours |
 
-That second line is the number to watch — a Cloudflare-triggered stealth retry bills
-several credits, so the real cost per page is only knowable by measuring it. Divide
-your monthly allowance by it to get your true daily page budget, then set
-`cardmarketDailyBudget` accordingly.
+Watch the `credits/scrape` line after the first real run to see which row you are on.
 
 Setup: add the Firecrawl API key as the **`FIRECRAWL_API_KEY`** repo secret
-(Settings → Secrets and variables → Actions). Without it the run still succeeds and
-simply skips the Cardmarket cards. Failures never blank a card: the previous offers
-are kept and the run records the error. A card deferred by the budget keeps its
-prices too, and is not marked as an error.
+(Settings → Secrets and variables → Actions). The Cardmarket workflow fails loudly
+without it; CardTrader is unaffected either way. Failures never blank a card — the
+previous offers are kept and the run records the error — and a card deferred by the
+budget keeps its prices too, without being marked as an error.
 
 ## Branching strategy
 

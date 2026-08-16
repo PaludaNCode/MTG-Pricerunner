@@ -17,13 +17,22 @@
 <div id="watching" class="watching"></div>
 <div id="grid"></div>
 
-<!-- On Pages, data comes from the `data` branch (updated by update-data.yml without a deploy),
-     served from raw.githubusercontent.com. Its Fastly CDN caches max-age=300, so staleness is
-     bounded to ~5 min and self-heals every cycle — a good fit for the ~2-5 min update cadence.
+<!-- Two feeds, two branches, two cadences: `data` holds CardTrader (update-data.yml, every
+     couple of minutes) and `data-cm` holds Cardmarket (update-cardmarket.yml, hourly at most —
+     it is metered scraping). Both are served from raw.githubusercontent.com, whose Fastly CDN
+     caches max-age=300, so staleness is bounded to ~5 min and self-heals every cycle.
      We deliberately do NOT use jsDelivr here: it caches @branch refs for ~12h and its purge API
      is rate-limited, so purging every run gets throttled and the site sticks on a stale snapshot.
-     On localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
-<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000 };</script>
+     On localhost (verify-mobile.js), the relative paths keep the smoke test offline. -->
+<script>window.DASH = (function () {
+  var live = location.hostname.endsWith("github.io");
+  var raw = "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/";
+  return {
+    url: live ? raw + "data/data.json" : "data.json",
+    cmUrl: live ? raw + "data-cm/cardmarket.json" : "cardmarket.json",
+    intervalMs: 60000,
+  };
+})();</script>
 <script src="render.js"></script>
 <script src="app.js"></script>
 </body>
