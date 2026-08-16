@@ -1,9 +1,11 @@
 {
   "defaultLanguage": "jp",
   "cardmarketTtlMinutes": 360,
+  "cardmarketDailyBudget": 12,
+  "cardmarketMinCredits": 25,
   "cardmarketCountry": "DK",
   "_howto": "Add a card: copy its CardTrader (or Cardmarket) URL, paste as `url`, give it a `group` (card name), a `variant` (printing) and a `code` (official Scryfall set code, shown instead of variant on phones). language defaults to defaultLanguage. Cardmarket URLs need `?language=7` (Japanese) — the site filters there, not via `language`.",
-  "_cardmarket": "Cardmarket is scraped through Firecrawl, which costs a credit per scrape. cardmarketTtlMinutes throttles that: a card is re-scraped only once its last result is that old, so credits/day ≈ cardmarket cards × 1440 / cardmarketTtlMinutes (5 cards at 360 min = 20/day). cardmarketCountry is the country Firecrawl browses from.",
+  "_cardmarket": "Cardmarket is scraped through Firecrawl, which bills credits per scrape (more when Cloudflare forces the stealth proxy). Three brakes: cardmarketTtlMinutes = don't re-scrape a card younger than this; cardmarketDailyBudget = hard cap on scrapes per UTC day, stalest card first so the allowance rotates; cardmarketMinCredits = stop while this many credits are still in the account. The daily budget is the real spend limit — raise it only if the plan can take it. cardmarketCountry is the country Firecrawl browses from.",
   "cards": [
     { "url": "https://www.cardtrader.com/en/cards/232333", "group": "Runehorn Hellkite", "variant": "Starter Cmdr Decks", "code": "SCD" },
     { "url": "https://www.cardtrader.com/en/cards/6401", "group": "Runehorn Hellkite", "variant": "Commander 2016", "code": "C16" },

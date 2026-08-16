@@ -2,7 +2,7 @@
 // a wrong answer here either burns the quota or freezes prices on the page.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { isFresh } = require("../cloud/fetch-cardmarket");
+const { isFresh, budgetLeft, utcDay } = require("../cloud/fetch-cardmarket");
 
 const NOW = Date.parse("2026-08-16T12:00:00.000Z");
 const ago = (minutes) => ({ fetchedAt: new Date(NOW - minutes * 60000).toISOString() });
@@ -26,4 +26,21 @@ test("a zero or negative TTL disables reuse entirely", () => {
 
 test("a fetchedAt in the future is not treated as fresh forever", () => {
   assert.equal(isFresh(ago(-120), 60, NOW), false);
+});
+
+test("the daily budget counts down and resets on the UTC day boundary", () => {
+  const today = utcDay(NOW);
+  assert.equal(today, "2026-08-16");
+
+  assert.equal(budgetLeft(null, 12, NOW), 12); // no meta yet
+  assert.equal(budgetLeft({ day: today, scrapes: 5 }, 12, NOW), 7);
+  assert.equal(budgetLeft({ day: today, scrapes: 12 }, 12, NOW), 0);
+  assert.equal(budgetLeft({ day: today, scrapes: 99 }, 12, NOW), 0, "never negative");
+  // Yesterday's tally must not eat into today's allowance.
+  assert.equal(budgetLeft({ day: "2026-08-15", scrapes: 12 }, 12, NOW), 12);
+});
+
+test("a zero or missing daily budget stops all scraping", () => {
+  assert.equal(budgetLeft({ day: utcDay(NOW), scrapes: 0 }, 0, NOW), 0);
+  assert.equal(budgetLeft(null, undefined, NOW), 0);
 });

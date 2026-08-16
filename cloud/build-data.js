@@ -26,16 +26,21 @@ if (!TOKEN) {
   process.exit(1);
 }
 
+// The previous file carries both the last results and `meta.cardmarket`, the running
+// tally of today's Firecrawl scrapes. Losing it just means the day's budget restarts.
 function readPrev() {
   const i = process.argv.indexOf("--prev");
   const file = i !== -1 ? process.argv[i + 1] : null;
-  if (!file) return [];
+  if (!file) return { results: [], meta: {} };
   try {
     const prev = JSON.parse(fs.readFileSync(file, "utf8"));
-    return Array.isArray(prev.results) ? prev.results : [];
+    return {
+      results: Array.isArray(prev.results) ? prev.results : [],
+      meta: prev.meta && typeof prev.meta === "object" ? prev.meta : {},
+    };
   } catch (e) {
     console.log(`no usable previous data (${e.message}) — every card will be fetched fresh`);
-    return [];
+    return { results: [], meta: {} };
   }
 }
 
@@ -44,6 +49,7 @@ function readPrev() {
   const ct = products.filter((p) => p.site === "cardtrader");
   const cm = products.filter((p) => p.site === "cardmarket");
   const prev = readPrev();
+  const prevMeta = prev.meta;
 
   const ctOut = await cardtrader.fetchAll(ct, { token: TOKEN });
 
@@ -55,18 +61,27 @@ function readPrev() {
     process.exit(1);
   }
 
-  let cmOut = { results: [], scraped: 0 };
+  let cmOut = { results: [], scraped: 0, meta: prevMeta.cardmarket };
   if (cm.length && !FIRECRAWL_KEY) {
     console.log(`skipping ${cm.length} Cardmarket card(s): FIRECRAWL_API_KEY is not set`);
   } else if (cm.length) {
-    const ttlMinutes = CONFIG.cardmarketTtlMinutes != null ? CONFIG.cardmarketTtlMinutes : cardmarket.DEFAULT_TTL_MINUTES;
+    const pick = (key, fallback) => (CONFIG[key] != null ? CONFIG[key] : fallback);
+    const ttlMinutes = pick("cardmarketTtlMinutes", cardmarket.DEFAULT_TTL_MINUTES);
+    const dailyBudget = pick("cardmarketDailyBudget", cardmarket.DEFAULT_DAILY_BUDGET);
     cmOut = await cardmarket.fetchAll(cm, {
       apiKey: FIRECRAWL_KEY,
-      prev,
+      prev: prev.results,
       ttlMinutes,
+      dailyBudget,
+      minCredits: pick("cardmarketMinCredits", cardmarket.DEFAULT_MIN_CREDITS),
       country: CONFIG.cardmarketCountry || null,
+      meta: prevMeta.cardmarket,
+      checkCredits: true,
     });
-    console.log(`Cardmarket: ${cmOut.scraped} scrape(s) this run (ttl ${ttlMinutes} min)`);
+    console.log(
+      `Cardmarket: ${cmOut.scraped} scrape(s) this run (ttl ${ttlMinutes} min); ` +
+        `${cmOut.meta.scrapes}/${dailyBudget} used on ${cmOut.meta.day}`,
+    );
   }
 
   // Emit in config order so the page's card order stays the one curated in config.json.
@@ -74,7 +89,10 @@ function readPrev() {
   for (const r of [...ctOut.results, ...cmOut.results]) byKey.set(r.site + " " + r.productUrl, r);
   const results = products.map((p) => byKey.get(p.site + " " + p.productUrl)).filter(Boolean);
 
+  // `meta` is bookkeeping that must survive to the next run (the page ignores it).
+  const meta = { ...prevMeta, ...(cmOut.meta ? { cardmarket: cmOut.meta } : {}) };
+
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), results }, null, 0));
+  fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), meta, results }, null, 0));
   console.log(`wrote ${OUT} (${results.length} entries)`);
 })();

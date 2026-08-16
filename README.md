@@ -58,23 +58,39 @@ so those pages are scraped through [Firecrawl](https://firecrawl.dev). That cost
 credit per scrape, and the data workflow runs every couple of minutes — scraping
 every card every run would drain a plan within hours.
 
-`cardmarketTtlMinutes` in `config.json` is the throttle. Each Cardmarket result
-carries a `fetchedAt`, the workflow hands the previous `data.json` to
-`build-data.js --prev`, and a result is re-scraped only once it is older than the
-TTL. Budget:
+Three knobs in `config.json` bound the spend, weakest to strongest:
+
+| Knob | Default | What it does |
+|---|---|---|
+| `cardmarketTtlMinutes` | 360 | Don't re-scrape a card whose last result is younger than this. |
+| `cardmarketDailyBudget` | 12 | Hard cap on scrapes per UTC day, whatever the TTL says. |
+| `cardmarketMinCredits` | 25 | Stop while this many credits are still in the account. |
+
+The TTL sets the *ambition* (`cards × 1440 / ttlMinutes` refreshes a day — 20 for 5
+cards at 360 min); the daily budget is the actual ceiling. When more cards are due
+than budget remains, the **stalest** ones go first, so a budget smaller than the
+queue rotates through the list instead of always refreshing the top of
+`config.json`. The tally lives in `data.json` under `meta.cardmarket` and resets at
+00:00 UTC; `build-data.js --prev` is what carries it between runs.
+
+Before scraping, the run reads the live balance from `/v2/team/credit-usage` and
+logs what it actually spent:
 
 ```
-scrapes/day ≈ cardmarket cards × 1440 / cardmarketTtlMinutes
+Firecrawl: 431 credits remaining of 500; reserve 25
+Firecrawl: spent 10 credit(s) on 2 scrape(s) (5.0/scrape), 421 remaining
 ```
 
-At the default 360 min, 5 Cardmarket cards cost ~20 credits/day. Lower the TTL for
-fresher prices, raise it to stretch the quota. CardTrader is unaffected — it is a
-free API call and keeps refreshing every run.
+That second line is the number to watch — a Cloudflare-triggered stealth retry bills
+several credits, so the real cost per page is only knowable by measuring it. Divide
+your monthly allowance by it to get your true daily page budget, then set
+`cardmarketDailyBudget` accordingly.
 
 Setup: add the Firecrawl API key as the **`FIRECRAWL_API_KEY`** repo secret
 (Settings → Secrets and variables → Actions). Without it the run still succeeds and
 simply skips the Cardmarket cards. Failures never blank a card: the previous offers
-are kept and the run records the error.
+are kept and the run records the error. A card deferred by the budget keeps its
+prices too, and is not marked as an error.
 
 ## Branching strategy
 
