@@ -128,3 +128,37 @@ test("Universes Beyond set names lose the 'Magic The Gathering' prefix", () => {
   `));
   assert.equal(o2.variant, "Magic Origins");
 });
+
+test("an absolute product link identifies the printing too", () => {
+  // The first attempt only matched relative hrefs and found nothing on the live page.
+  const [o] = parseCardmarket(row(1, `
+    <a href="https://www.cardmarket.com/en/Magic/Products/Singles/Onslaught/Windswept-Heath?language=7">ONS</a>
+    <span class="fw-bold">30,00 €</span>
+  `));
+  assert.equal(o.variant, "Onslaught");
+  assert.equal(o.productUrl, "https://www.cardmarket.com/en/Magic/Products/Singles/Onslaught/Windswept-Heath");
+});
+
+test("an expansion symbol names the printing when the row has no product link", () => {
+  const [o] = parseCardmarket(row(1, `
+    <span class="icon expansion-symbol" aria-label="Zendikar"></span>
+    <span class="fw-bold">44,00 €</span>
+  `));
+  assert.equal(o.variant, "Zendikar", "the symbol's label is the only set signal in this shape");
+
+  // Bootstrap's moved tooltip attribute, and the brand prefix stripped here too.
+  const [o2] = parseCardmarket(row(1, `
+    <span class="expansion" data-bs-original-title="Magic: The Gathering — Marvel Super Heroes"></span>
+    <span class="fw-bold">4,00 €</span>
+  `));
+  assert.equal(o2.variant, "Marvel Super Heroes");
+});
+
+test("a non-expansion tooltip is never mistaken for a set", () => {
+  const [o] = parseCardmarket(row(1, `
+    <span title="Foil"></span>
+    <a href="/en/Magic/Users/SomeSeller">SomeSeller</a>
+    <span class="fw-bold">2,00 €</span>
+  `));
+  assert.equal(o.variant, null, "only tags mentioning 'expansion' count");
+});
