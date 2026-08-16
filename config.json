@@ -1,6 +1,13 @@
 {
   "defaultLanguage": "jp",
-  "_howto": "Add a card: copy its CardTrader URL, paste as `url`, give it a `group` (card name), a `variant` (printing) and a `code` (official Scryfall set code, shown instead of variant on phones). language defaults to defaultLanguage.",
+  "cardmarketTtlMinutes": 120,
+  "cardmarketPerRunLimit": 2,
+  "cardmarketMonthlyCredits": 1000,
+  "cardmarketMinCredits": 50,
+  "cardmarketDailyBudget": 6,
+  "cardmarketCountry": "DK",
+  "_howto": "Add a card: copy its CardTrader (or Cardmarket) URL, paste as `url`, give it a `group` (card name), a `variant` (printing) and a `code` (official Scryfall set code, shown instead of variant on phones). language defaults to defaultLanguage. Cardmarket URLs need `?language=7` (Japanese) — the site filters there, not via `language`. For Cardmarket prefer the ALL-VERSIONS page (/Magic/Cards/<Card-Name>) over a single printing (/Magic/Products/Singles/<Set>/<Card>): one scrape then covers every printing of that card, and each offer reports its own set. Mark such an entry with allVersions: true and give it variant \"All printings\" (no code — the set comes per offer). CardTrader has no equivalent, which is why it still needs one URL per printing.",
+  "_cardmarket": "Cardmarket is scraped hourly by its own workflow (update-cardmarket.yml) through Firecrawl, which bills credits per scrape — more when Cloudflare forces the stealth proxy, so the real cost is measured rather than assumed. The budget is denominated in CREDITS: each run spends against remaining balance / days left in the billing period, minus what today already cost. cardmarketMonthlyCredits (the plan size) only paces things when the API reports no billing period. cardmarketPerRunLimit stops one hourly wake eating the whole day. cardmarketTtlMinutes is deliberately low (2h) so the credit allowance, not the TTL, is what limits refreshes — stalest card first. cardmarketMinCredits is the untouchable reserve; cardmarketDailyBudget is only a fallback cap for when the balance can't be read. cardmarketCountry is the country Firecrawl browses from.",
   "cards": [
     { "url": "https://www.cardtrader.com/en/cards/232333", "group": "Runehorn Hellkite", "variant": "Starter Cmdr Decks", "code": "SCD" },
     { "url": "https://www.cardtrader.com/en/cards/6401", "group": "Runehorn Hellkite", "variant": "Commander 2016", "code": "C16" },
@@ -42,6 +49,31 @@
     { "url": "https://www.cardtrader.com/en/cards/19316-verdant-catacombs-zendikar", "group": "Verdant Catacombs", "variant": "Zendikar", "code": "ZEN" },
     { "url": "https://www.cardtrader.com/en/cards/27073-windswept-heath-onslaught", "group": "Windswept Heath", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/27071-wooded-foothills-onslaught", "group": "Wooded Foothills", "variant": "Onslaught", "code": "ONS" },
-    { "url": "https://www.cardtrader.com/en/cards/27088-bloodstained-mire-onslaught", "group": "Bloodstained Mire", "variant": "Onslaught", "code": "ONS" }
+    { "url": "https://www.cardtrader.com/en/cards/27088-bloodstained-mire-onslaught", "group": "Bloodstained Mire", "variant": "Onslaught", "code": "ONS" },
+
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Agadeems-Awakening-Agadeem-the-Undercrypt?language=7", "group": "Agadeem's Awakening", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Flow-State?language=7", "group": "Flow State", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Stock-Up?language=7", "group": "Stock Up", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Arid-Mesa?language=7", "group": "Arid Mesa", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Bloodstained-Mire?language=7", "group": "Bloodstained Mire", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Verdant-Catacombs?language=7", "group": "Verdant Catacombs", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Windswept-Heath?language=7", "group": "Windswept Heath", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Wooded-Foothills?language=7", "group": "Wooded Foothills", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Seeker-of-Skybreak?language=7", "group": "Seeker of Skybreak", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Guide-of-Souls?language=7", "group": "Guide of Souls", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Planar-Nexus?language=7", "group": "Planar Nexus", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Lively-Dirge?language=7", "group": "Lively Dirge", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Into-the-Flood-Maw?language=7", "group": "Into the Flood Maw", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Stormchasers-Talent?language=7", "group": "Stormchaser's Talent", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Memory-Guardian?language=7", "group": "Memory Guardian", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hawkeyes-Bow?language=7", "group": "Hawkeye's Bow", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Shuri-Wakandan-Inventor?language=7", "group": "Shuri, Wakandan Inventor", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Raph-Mikey-Troublemakers?language=7", "group": "Raph & Mikey, Troublemakers", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Loch-Mare?language=7", "group": "Loch Mare", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Sewer-veillance-Cam?language=7", "group": "Sewer Veillance Cam", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hide-on-the-Ceiling?language=7", "group": "Hide on the Ceiling", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Skateboard?language=7", "group": "Skateboard", "variant": "All printings", "allVersions": true }
   ]
 }

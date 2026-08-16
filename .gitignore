@@ -1,6 +1,7 @@
 node_modules/
 docs/analysis/
 cloud/web/data.json
+cloud/web/cardmarket.json
 cloud/web/ui.css
 cloud/web/render.js
 cloud/web/app.js

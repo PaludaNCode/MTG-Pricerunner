@@ -6,7 +6,12 @@ on:
   workflow_dispatch: {} # manual run button + external pinger target
   push:
     branches: [main]
-    paths: ["config.json", "cloud/fetch-cardtrader.js", "shared/cards.js", ".github/workflows/update-data.yml"]
+    paths:
+      - "config.json"
+      - "cloud/build-data.js"
+      - "cloud/fetch-cardtrader.js"
+      - "shared/cards.js"
+      - ".github/workflows/update-data.yml"
 
 permissions:
   contents: write # force-push the data branch
@@ -28,8 +33,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
+      # CardTrader only, and stateless by design: nothing is carried between runs, so
+      # a failed run costs nothing but a stale minute. Cardmarket has its own workflow.
       - name: Fetch CardTrader data -> cloud/web/data.json
-        run: node cloud/fetch-cardtrader.js
+        run: node cloud/build-data.js
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
       # The data branch is a build artifact: a single orphan commit, force-pushed

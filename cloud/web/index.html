@@ -9,21 +9,43 @@
 </head>
 <body>
 <header>
-  <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Japanese</span></h1>
+  <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Cardmarket · Japanese</span></h1>
   <span class="live"><span class="dot"></span>live</span>
   <span class="spacer"></span>
   <span id="updated" class="meta">loading…</span>
+  <!-- On-demand Cardmarket scrape. Only usable by someone holding a GitHub PAT with
+       Actions: write — typed into the field below and kept in this browser's
+       localStorage, never in this page. See app.js. -->
+  <span class="refresh-group">
+    <input id="cm-token" class="token" type="password" autocomplete="off" spellcheck="false"
+           placeholder="GitHub PAT (Actions: write)" aria-label="GitHub token for the Cardmarket refresh" hidden />
+    <button id="cm-token-toggle" class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>
+    <button id="cm-refresh" class="refresh" type="button" title="Scrape Cardmarket now">↻ CM</button>
+  </span>
 </header>
+<div id="legend" class="legend"></div>
 <div id="watching" class="watching"></div>
 <div id="grid"></div>
 
-<!-- On Pages, data comes from the `data` branch (updated by update-data.yml without a deploy),
-     served from raw.githubusercontent.com. Its Fastly CDN caches max-age=300, so staleness is
-     bounded to ~5 min and self-heals every cycle — a good fit for the ~2-5 min update cadence.
+<!-- Two feeds, two branches, two cadences: `data` holds CardTrader (update-data.yml, every
+     couple of minutes) and `data-cm` holds Cardmarket (update-cardmarket.yml, hourly at most —
+     it is metered scraping). Both are served from raw.githubusercontent.com, whose Fastly CDN
+     caches max-age=300, so staleness is bounded to ~5 min and self-heals every cycle.
      We deliberately do NOT use jsDelivr here: it caches @branch refs for ~12h and its purge API
      is rate-limited, so purging every run gets throttled and the site sticks on a stale snapshot.
-     On localhost (verify-mobile.js), the relative path keeps the smoke test offline. -->
-<script>window.DASH = { url: location.hostname.endsWith("github.io") ? "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/data/data.json" : "data.json", intervalMs: 60000 };</script>
+     On localhost (verify-mobile.js), the relative paths keep the smoke test offline. -->
+<script>window.DASH = (function () {
+  var live = location.hostname.endsWith("github.io");
+  var raw = "https://raw.githubusercontent.com/PaludaNCode/MTG-Pricerunner/";
+  return {
+    url: live ? raw + "data/data.json" : "data.json",
+    cmUrl: live ? raw + "data-cm/cardmarket.json" : "cardmarket.json",
+    intervalMs: 60000,
+    // Target for the "↻ CM" button. force:true is sent as a workflow input so a manual
+    // press ignores the TTL — the credit allowance still caps what it can spend.
+    dispatch: { repo: "PaludaNCode/MTG-Pricerunner", workflow: "update-cardmarket.yml", ref: "main" },
+  };
+})();</script>
 <script src="render.js"></script>
 <script src="app.js"></script>
 </body>

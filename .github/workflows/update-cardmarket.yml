@@ -1,0 +1,103 @@
+name: Update Cardmarket data
+
+# Separate from "Update card data" on purpose. CardTrader is a free API call every
+# couple of minutes; Cardmarket is metered scraping through Firecrawl, so it gets its
+# own slow cron, its own file and its own branch. Nothing this job owns is ever
+# touched by the fast job — in particular the credit ledger in `meta`.
+#
+# Hourly is the *ceiling*, not the rate: fetch-cardmarket.js decides how many cards it
+# can actually afford on each wake (TTL, per-run limit, and a daily credit allowance
+# derived from the live balance). Most wakes will scrape nothing.
+on:
+  schedule:
+    - cron: "17 * * * *" # hourly, off the round hour where GitHub's scheduler is busiest
+  workflow_dispatch: # manual run button, and the site's "Refresh now" button
+    inputs:
+      force:
+        description: "Ignore the TTL and per-run limit (the credit allowance still applies)"
+        type: boolean
+        default: false
+      cards:
+        description: "Comma-separated card names to scrape. Empty = every card, stalest first."
+        type: string
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - "config.json"
+      - "cloud/build-cardmarket.js"
+      - "cloud/fetch-cardmarket.js"
+      - "cloud/cardmarket-parse.js"
+      - "shared/cards.js"
+      - ".github/workflows/update-cardmarket.yml"
+
+permissions:
+  contents: write # force-push the data-cm branch
+  actions: write # keepalive step re-enables this workflow
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# Never run two scrapes at once — they would double-spend the same daily allowance,
+# and the loser's ledger update would be lost. Unlike the data job, do NOT cancel in
+# progress: a cancelled run may have already spent credits without recording them.
+concurrency:
+  group: data-cm
+  cancel-in-progress: false
+
+jobs:
+  publish-cardmarket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      # The previous cardmarket.json is the budget ledger: cached offers, credits spent
+      # today, and the learned cost per scrape. Losing it re-scrapes everything and
+      # restarts the day's allowance, so read it straight off the branch rather than
+      # through raw.githubusercontent's cache.
+      - name: Pull the previous cardmarket.json (offers + credit ledger)
+        run: |
+          if git fetch --depth=1 origin data-cm 2>/dev/null &&
+             git show FETCH_HEAD:cardmarket.json > /tmp/prev-cm.json 2>/dev/null; then
+            echo "previous cardmarket.json: $(wc -c < /tmp/prev-cm.json) bytes"
+          else
+            rm -f /tmp/prev-cm.json
+            echo "no previous cardmarket.json — first run, or the branch is missing"
+          fi
+      - name: Scrape Cardmarket -> cloud/web/cardmarket.json
+        run: node cloud/build-cardmarket.js --prev /tmp/prev-cm.json
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          CM_FORCE: ${{ inputs.force }}
+          CM_CARDS: ${{ inputs.cards }}
+      # Same build-artifact pattern as the `data` branch: a single orphan commit,
+      # force-pushed every run. Never branch from it or PR into it.
+      - name: Publish cardmarket.json to the data-cm branch
+        run: |
+          d=$(mktemp -d)
+          cp cloud/web/cardmarket.json "$d/"
+          cd "$d"
+          git init -b data-cm
+          git add cardmarket.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "cardmarket $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data-cm
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # Scheduled workflows are auto-disabled after 60 days without repo activity;
+      # re-enabling on every run resets that clock deterministically. GitHub's API
+      # 503s in short bursts, so ride those out instead of failing after the data
+      # has already been published.
+      - name: Keepalive
+        run: |
+          for delay in 2 4 8; do
+            if gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-cardmarket.yml/enable"; then
+              exit 0
+            fi
+            echo "keepalive attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-cardmarket.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
