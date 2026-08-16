@@ -59,7 +59,9 @@
     ];
     if (opts.showShips) cols.push({ key: "ship", label: opts.shipLabel || "Ship", cell: shipCell });
     if (opts.showSrc) cols.push({ key: "src", label: "Src", cell: (o) => SRC[o._site] || o._site });
-    cols.push({ key: "seller", label: "Seller", cell: (o) => esc(o.seller) });
+    // No Seller column: the name was eating a fifth of the table for something you
+    // rarely act on, and the room is worth more to Set — which was truncating to "C…"
+    // on phones. The seller is still one tap away through the Set link.
     // Phones show the official set code (`code` in config.json) instead of the
     // full variant name; data.json entries predating the field fall back to it.
     cols.push({ key: "set", label: "Set", cell: (o) => `<a href="${esc(o._url)}" target="_blank"><span class="set-full">${esc(o._variant)}</span><span class="set-code">${esc(o._code || o._variant)}</span></a>` });

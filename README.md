@@ -112,6 +112,10 @@ ticked, bounded only by the credit allowance and the reserve.
 
 Watch the `credits/scrape` line after the first real run to see which row you are on.
 
+**Checking the balance costs nothing.** The site's legend has a "Check credit balance"
+link, and the workflow has a `balance_only` input: both read the Firecrawl balance and
+scrape nothing. Reading the balance is not billed.
+
 Setup: add the Firecrawl API key as the **`FIRECRAWL_API_KEY`** repo secret
 (Settings → Secrets and variables → Actions). The Cardmarket workflow fails loudly
 without it; CardTrader is unaffected either way. Failures never blank a card — the
