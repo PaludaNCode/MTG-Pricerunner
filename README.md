@@ -183,6 +183,21 @@ fails if it's missing), and merge to `main` via PR. That push triggers an immedi
 data refresh.
 
 Entries sharing a `group` are merged into one card on the page, so pasting both a
-CardTrader and a Cardmarket URL for the same printing puts both sites' offers in one
+CardTrader and a Cardmarket URL for the same card puts both sites' offers in one
 price-sorted table. Cardmarket URLs must keep their `?language=7` (Japanese) query —
 that is the only language filter Cardmarket offers, and CI checks it is there.
+
+**For Cardmarket, use the all-versions URL.** Cardmarket has a per-card page listing
+every printing's offers at once:
+
+```
+https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7      <- one scrape, all printings
+https://www.cardmarket.com/en/Magic/Products/Singles/Commander-2016/Runehorn-Hellkite?language=7   <- one printing
+```
+
+CardTrader has no equivalent, which is why it needs a URL per printing. Since every
+Cardmarket scrape costs credits, one URL per *card* rather than per *printing* is a
+direct saving — 24 URLs cover all 41 printings currently watched. Flag those entries
+`"allVersions": true` and give them `"variant": "All printings"` with no `code`; each
+offer reports its own set, read from the row. CI fails if a `/Magic/Cards/` URL is
+missing the flag, since that would label every offer with a single set.

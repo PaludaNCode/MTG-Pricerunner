@@ -34,6 +34,9 @@ function normalizeCards(cfg) {
         group: c.group || name,
         variant: c.variant || "",
         code: c.code || null,
+        // Cardmarket's /Magic/Cards/<Name> page covers every printing at once, so such
+        // an entry has no single set of its own — each offer carries its own.
+        allVersions: !!c.allVersions,
         language,
         name,
         productUrl,

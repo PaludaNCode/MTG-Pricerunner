@@ -66,3 +66,49 @@ test("looksBlocked spots a Cloudflare interstitial but not a real page", () => {
   assert.equal(looksBlocked(""), false);
   assert.equal(looksBlocked(null), false);
 });
+
+// The all-versions page (/Magic/Cards/<Name>) mixes printings in one table; each row
+// links to its own printing. That link is the only per-row set signal, and getting it
+// wrong would label every offer with one set.
+const ALL_VERSIONS_PAGE =
+  row(1, `
+    <a href="/en/Magic/Products/Singles/Commander-2016/Runehorn-Hellkite">C16</a>
+    <a href="/en/Magic/Users/SellerA">SellerA</a>
+    <span class="article-condition condition-NM"></span>
+    <span class="fw-bold">4,50 €</span>
+    <span class="item-count">2</span>
+  `) +
+  row(2, `
+    <a href="/en/Magic/Products/Singles/Starter-Commander-Decks/Runehorn-Hellkite">SCD</a>
+    <a href="/en/Magic/Users/SellerB">SellerB</a>
+    <span class="article-condition condition-EX"></span>
+    <span class="fw-bold">3,20 €</span>
+    <span class="item-count">1</span>
+  `);
+
+test("all-versions rows carry their own set and product URL", () => {
+  const [a, b] = parseCardmarket(ALL_VERSIONS_PAGE);
+
+  assert.equal(a.variant, "Commander 2016"); // de-slugged from the row's product link
+  assert.equal(a.productUrl, "https://www.cardmarket.com/en/Magic/Products/Singles/Commander-2016/Runehorn-Hellkite");
+  assert.equal(a.price, 4.5);
+  assert.equal(a.seller, "SellerA");
+
+  assert.equal(b.variant, "Starter Commander Decks");
+  assert.equal(b.seller, "SellerB");
+  assert.notEqual(a.variant, b.variant, "two printings in one table must not collapse to one set");
+});
+
+test("single-product rows report no set, so the config entry's own set is used", () => {
+  const [o] = parseCardmarket(LOGGED_OUT_PAGE);
+  assert.equal(o.variant, null);
+  assert.equal(o.productUrl, null);
+});
+
+test("a seller link is never mistaken for a printing link", () => {
+  const [o] = parseCardmarket(row(1, `
+    <a href="/en/Magic/Users/Products-Singles-Trickster">Tricky</a>
+    <span class="fw-bold">1,00 €</span>
+  `));
+  assert.equal(o.variant, null, "only /Magic/Products/Singles/ links identify a printing");
+});

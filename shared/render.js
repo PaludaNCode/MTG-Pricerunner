@@ -59,7 +59,16 @@
       let merged = [];
       for (const p of groups[g]) {
         if (p.error) errored.add(g);
-        for (const o of p.offers || []) merged.push({ ...o, _variant: p.variant || "", _code: p.code || "", _site: p.site, _url: p.productUrl });
+        // An offer may carry its own set: Cardmarket's all-versions page returns one
+        // table mixing every printing, so the row wins over the entry when it says so.
+        for (const o of p.offers || [])
+          merged.push({
+            ...o,
+            _variant: o.variant || p.variant || "",
+            _code: o.code || (o.variant ? "" : p.code || ""),
+            _site: p.site,
+            _url: o.productUrl || p.productUrl,
+          });
       }
       merged.sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
       if (!merged.length) { empty.push(g); continue; }

@@ -59,9 +59,31 @@ test("no duplicate cardmarket entries (same URL)", () => {
   assert.equal(new Set(urls).size, urls.length, "duplicate Cardmarket URL in config.json");
 });
 
+// An all-versions Cardmarket entry (/Magic/Cards/<Name>) spans every printing, so it
+// has no single set — the per-offer set comes off each row instead.
 test("every card entry has an official set code (shown on phones)", () => {
   const cfg = JSON.parse(raw);
   for (const p of normalizeCards(cfg)) {
+    if (p.allVersions) continue;
     assert.ok(p.code, `missing "code" for ${p.name}`);
+  }
+});
+
+test("only Cardmarket /Magic/Cards/ entries may declare allVersions", () => {
+  const cfg = JSON.parse(raw);
+  for (const p of normalizeCards(cfg).filter((p) => p.allVersions)) {
+    assert.equal(p.site, "cardmarket", `allVersions is Cardmarket-only (${p.name})`);
+    assert.match(p.productUrl, /\/Magic\/Cards\//, `allVersions needs the /Magic/Cards/ URL (${p.name})`);
+  }
+});
+
+// The reverse guard: a /Magic/Cards/ URL without the flag would label every offer with
+// one entry's set, silently mislabelling most rows.
+test("every Cardmarket /Magic/Cards/ entry is marked allVersions", () => {
+  const cfg = JSON.parse(raw);
+  for (const p of normalizeCards(cfg).filter((p) => p.site === "cardmarket")) {
+    if (/\/Magic\/Cards\//.test(p.productUrl)) {
+      assert.ok(p.allVersions, `${p.productUrl} is an all-versions page but isn't flagged`);
+    }
   }
 });

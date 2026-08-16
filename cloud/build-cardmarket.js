@@ -61,6 +61,13 @@ function readPrev() {
   // A manual press means "I want this now", so it ignores the TTL and the per-run limit
   // — but NOT the credit allowance or the reserve. On-demand must never be able to
   // outspend the plan; the worst it can do is use today's allowance sooner.
+  // --dump <dir> saves each scraped page's raw HTML. Cardmarket can't be fetched from a
+  // dev box either (Cloudflare), so this is the way to get a real page in front of the
+  // parser when its regexes need checking against current markup.
+  const dumpIdx = process.argv.indexOf("--dump");
+  const dumpDir = dumpIdx !== -1 ? process.argv[dumpIdx + 1] : null;
+  if (dumpDir) fs.mkdirSync(dumpDir, { recursive: true });
+
   const force = /^(true|1|yes)$/i.test(process.env.CM_FORCE || "");
   if (force) console.log("forced refresh: ignoring the TTL and per-run limit (credit allowance still applies)");
 
@@ -75,6 +82,13 @@ function readPrev() {
     monthlyCredits: pick("cardmarketMonthlyCredits", cardmarket.DEFAULT_MONTHLY_CREDITS),
     country: CONFIG.cardmarketCountry || null,
     checkCredits: true,
+    onHtml: dumpDir
+      ? (p, html) => {
+          const f = path.join(dumpDir, p.productUrl.replace(/[^a-z0-9]+/gi, "-").slice(-80) + ".html");
+          fs.writeFileSync(f, html);
+          console.log("  dumped " + f);
+        }
+      : null,
   });
 
   // A run that scraped nothing is normal (everything fresh, or budget spent) — but it

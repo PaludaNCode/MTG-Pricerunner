@@ -6,7 +6,7 @@
   "cardmarketMinCredits": 50,
   "cardmarketDailyBudget": 6,
   "cardmarketCountry": "DK",
-  "_howto": "Add a card: copy its CardTrader (or Cardmarket) URL, paste as `url`, give it a `group` (card name), a `variant` (printing) and a `code` (official Scryfall set code, shown instead of variant on phones). language defaults to defaultLanguage. Cardmarket URLs need `?language=7` (Japanese) — the site filters there, not via `language`.",
+  "_howto": "Add a card: copy its CardTrader (or Cardmarket) URL, paste as `url`, give it a `group` (card name), a `variant` (printing) and a `code` (official Scryfall set code, shown instead of variant on phones). language defaults to defaultLanguage. Cardmarket URLs need `?language=7` (Japanese) — the site filters there, not via `language`. For Cardmarket prefer the ALL-VERSIONS page (/Magic/Cards/<Card-Name>) over a single printing (/Magic/Products/Singles/<Set>/<Card>): one scrape then covers every printing of that card, and each offer reports its own set. Mark such an entry with allVersions: true and give it variant \"All printings\" (no code — the set comes per offer). CardTrader has no equivalent, which is why it still needs one URL per printing.",
   "_cardmarket": "Cardmarket is scraped hourly by its own workflow (update-cardmarket.yml) through Firecrawl, which bills credits per scrape — more when Cloudflare forces the stealth proxy, so the real cost is measured rather than assumed. The budget is denominated in CREDITS: each run spends against remaining balance / days left in the billing period, minus what today already cost. cardmarketMonthlyCredits (the plan size) only paces things when the API reports no billing period. cardmarketPerRunLimit stops one hourly wake eating the whole day. cardmarketTtlMinutes is deliberately low (2h) so the credit allowance, not the TTL, is what limits refreshes — stalest card first. cardmarketMinCredits is the untouchable reserve; cardmarketDailyBudget is only a fallback cap for when the balance can't be read. cardmarketCountry is the country Firecrawl browses from.",
   "cards": [
     { "url": "https://www.cardtrader.com/en/cards/232333", "group": "Runehorn Hellkite", "variant": "Starter Cmdr Decks", "code": "SCD" },
@@ -54,7 +54,6 @@
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven/Flow-State?language=7", "group": "Flow State", "variant": "Strixhaven", "code": "SOS" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Secrets-of-Strixhaven-Mystical-Archive/Stock-Up-V1?language=7", "group": "Stock Up", "variant": "Mystical Archive V1", "code": "SOA" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Aetherdrift/Stock-Up?language=7", "group": "Stock Up", "variant": "Aetherdrift", "code": "DFT" },
-    { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Commander-2016/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "Commander 2016", "code": "C16" },
-    { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Starter-Commander-Decks/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "Starter Cmdr Decks", "code": "SCD" }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true }
   ]
 }

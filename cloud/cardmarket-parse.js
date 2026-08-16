@@ -6,9 +6,24 @@
 // Cardmarket serves this HTML only behind Cloudflare, which is why the fetcher
 // goes through Firecrawl rather than fetching the page directly.
 
+// Cardmarket has two page shapes and we use both:
+//
+//   /Magic/Products/Singles/<Set>/<Card>  — one printing, offers all from that set
+//   /Magic/Cards/<Card>                   — ALL printings of the card in one table
+//
+// The all-versions page is much cheaper (one scrape covers every printing, where
+// CardTrader needs a separate blueprint per printing), but its rows are a mix of sets,
+// so a row's set has to come from the row itself rather than from the product entry.
+// Each row on that page links to the specific printing's product page; that link is
+// both the set name and a per-offer URL. On a single-product page there is no such
+// link — the row IS the product — so `variant`/`productUrl` come back null and the
+// caller falls back to the config entry's own set. That keeps both shapes working.
+const ROW_PRODUCT_LINK = /href="(\/[a-z]{2}\/Magic\/Products\/Singles\/([^/"]+)\/[^"?#]+)"/;
+const unslug = (s) => decodeURIComponent(s).replace(/-/g, " ").trim();
+
 // Normalized offer shape (same contract as the CardTrader fetcher):
 // { price:Number|null, priceStr, foil:Bool|null, condition, qty, seller,
-//   location, language:String|null, shipsToMe:Bool|null }
+//   location, language:String|null, shipsToMe:Bool|null, variant, productUrl }
 function parseCardmarket(html) {
   const offers = [];
   const rowStarts = [];
@@ -33,6 +48,8 @@ function parseCardmarket(html) {
     if (/Login\?redirectTo/i.test(block)) shipsToMe = null; // logged out → unknown
     else if (/btn-grey|does not ship to your country/i.test(block)) shipsToMe = false;
     else shipsToMe = true;
+    // Which printing this row is for — only present on the all-versions page.
+    const prodMatch = block.match(ROW_PRODUCT_LINK);
     if (price !== null || sellerMatch) {
       offers.push({
         price,
@@ -44,6 +61,9 @@ function parseCardmarket(html) {
         location: locMatch ? locMatch[1].trim() : null,
         language: null, // not reliably exposed by the guest HTML; the ?language= URL filters instead
         shipsToMe,
+        // null on a single-product page; the caller then uses the config entry's set.
+        variant: prodMatch ? unslug(prodMatch[2]) : null,
+        productUrl: prodMatch ? "https://www.cardmarket.com" + prodMatch[1] : null,
       });
     }
   }

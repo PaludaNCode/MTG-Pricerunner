@@ -191,6 +191,7 @@ async function fetchAll(products, opts = {}) {
     monthlyCredits = DEFAULT_MONTHLY_CREDITS,
     meta = null,
     checkCredits = false,
+    onHtml = null, // (product, html) — used by --dump to save real pages for parser work
   } = opts;
 
   const prevByUrl = new Map();
@@ -268,6 +269,7 @@ async function fetchAll(products, opts = {}) {
     try {
       const html = await scrapeHtml(p.productUrl, { apiKey, country, retryBackoffMs });
       scraped++;
+      if (onHtml) onHtml(p, html);
       const offers = parseCardmarket(html);
       log(`${offers.length} offers`);
       results.push({ ...p, productUrl: p.productUrl, offers, fetchedAt: new Date(now).toISOString() });
