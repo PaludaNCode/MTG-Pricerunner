@@ -99,3 +99,19 @@ test("every cardmarket entry shares a group with a cardtrader entry", () => {
     assert.ok(ctGroups.has(p.group), `Cardmarket group "${p.group}" has no CardTrader card to attach to`);
   }
 });
+
+// A per-printing Cardmarket entry claims a specific printing, and its variant/code end
+// up in the Set column next to CardTrader rows for the same card. A typo there shows a
+// printing CardTrader never lists, which reads as a data bug rather than a config one.
+test("per-printing cardmarket entries name a printing CardTrader also watches", () => {
+  const all = normalizeCards(JSON.parse(raw));
+  const ctPrintings = new Set(
+    all.filter((p) => p.site === "cardtrader").map((p) => `${p.group}|${p.variant}|${p.code}`),
+  );
+  for (const p of all.filter((p) => p.site === "cardmarket" && !p.allVersions)) {
+    assert.ok(
+      ctPrintings.has(`${p.group}|${p.variant}|${p.code}`),
+      `Cardmarket entry "${p.group} / ${p.variant} (${p.code})" matches no CardTrader printing`,
+    );
+  }
+});
