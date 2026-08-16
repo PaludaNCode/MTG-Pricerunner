@@ -13,6 +13,10 @@
   <span class="live"><span class="dot"></span>live</span>
   <span class="spacer"></span>
   <span id="updated" class="meta">loading…</span>
+  <!-- On-demand Cardmarket scrape. Only usable by someone holding a GitHub PAT with
+       Actions: write — it is prompted for on first click and kept in localStorage,
+       never in this page. See app.js. -->
+  <button id="cm-refresh" class="refresh" type="button" title="Scrape Cardmarket now">↻ CM</button>
 </header>
 <div id="watching" class="watching"></div>
 <div id="grid"></div>
@@ -31,6 +35,9 @@
     url: live ? raw + "data/data.json" : "data.json",
     cmUrl: live ? raw + "data-cm/cardmarket.json" : "cardmarket.json",
     intervalMs: 60000,
+    // Target for the "↻ CM" button. force:true is sent as a workflow input so a manual
+    // press ignores the TTL — the credit allowance still caps what it can spend.
+    dispatch: { repo: "PaludaNCode/MTG-Pricerunner", workflow: "update-cardmarket.yml", ref: "main" },
   };
 })();</script>
 <script src="render.js"></script>

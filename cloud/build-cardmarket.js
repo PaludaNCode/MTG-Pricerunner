@@ -57,14 +57,21 @@ function readPrev() {
   const prev = readPrev();
   const pick = (key, fallback) => (CONFIG[key] != null ? CONFIG[key] : fallback);
 
+  // CM_FORCE is set by the "Refresh now" button on the site (a workflow_dispatch input).
+  // A manual press means "I want this now", so it ignores the TTL and the per-run limit
+  // — but NOT the credit allowance or the reserve. On-demand must never be able to
+  // outspend the plan; the worst it can do is use today's allowance sooner.
+  const force = /^(true|1|yes)$/i.test(process.env.CM_FORCE || "");
+  if (force) console.log("forced refresh: ignoring the TTL and per-run limit (credit allowance still applies)");
+
   const out = await cardmarket.fetchAll(products, {
     apiKey: FIRECRAWL_KEY,
     prev: prev.results,
     meta: prev.meta,
-    ttlMinutes: pick("cardmarketTtlMinutes", cardmarket.DEFAULT_TTL_MINUTES),
+    ttlMinutes: force ? 0 : pick("cardmarketTtlMinutes", cardmarket.DEFAULT_TTL_MINUTES),
     dailyBudget: pick("cardmarketDailyBudget", cardmarket.DEFAULT_DAILY_BUDGET),
     minCredits: pick("cardmarketMinCredits", cardmarket.DEFAULT_MIN_CREDITS),
-    perRunLimit: pick("cardmarketPerRunLimit", cardmarket.DEFAULT_PER_RUN_LIMIT),
+    perRunLimit: force ? products.length : pick("cardmarketPerRunLimit", cardmarket.DEFAULT_PER_RUN_LIMIT),
     monthlyCredits: pick("cardmarketMonthlyCredits", cardmarket.DEFAULT_MONTHLY_CREDITS),
     country: CONFIG.cardmarketCountry || null,
     checkCredits: true,

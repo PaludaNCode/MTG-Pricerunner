@@ -56,7 +56,9 @@ the API call is the only contract.
 ## Notes
 
 - The PAT is a write credential for Actions on this repo. Keep it only in the
-  scheduler's config; never commit it.
+  scheduler's config; never commit it. The site's "↻ CM" button uses a PAT with the
+  same permissions, entered in the browser and stored in `localStorage` — the same
+  token works for both, and it must never be placed in the page itself.
 - `update-data.yml` has `concurrency: group: data, cancel-in-progress: true`, so
   overlapping pings collapse to the newest run — over-pinging is harmless.
 - If the pinger dies, the in-repo cron (and its keepalive step) still updates data

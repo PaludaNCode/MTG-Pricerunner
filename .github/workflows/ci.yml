@@ -27,6 +27,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: UI smoke test (render + responsive overflow)
         run: node cloud/verify-mobile.js
+      - name: Refresh-button behaviour (dispatch payload, token, budget state)
+        run: node cloud/verify-refresh.js
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v7

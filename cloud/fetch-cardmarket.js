@@ -204,12 +204,14 @@ async function fetchAll(products, opts = {}) {
   // How many of them this run may actually pay for.
   let allowance = Math.max(0, perRunLimit);
   let credits = null;
+  let allowanceCredits = 0;
   const costPerScrape = (meta && meta.costPerScrape) || ASSUMED_COST_PER_SCRAPE;
 
   if (checkCredits && due.length && allowance > 0) credits = await getCredits(apiKey);
 
   if (credits) {
     const perDay = dailyCreditAllowance(credits, { minCredits, monthlyCredits, now });
+    allowanceCredits = perDay;
     const spentToday = creditsUsedToday(meta, now);
     const creditsLeftToday = Math.max(0, perDay - spentToday);
     const affordable = Math.floor(creditsLeftToday / costPerScrape);
@@ -296,6 +298,9 @@ async function fetchAll(products, opts = {}) {
   }
 
   const sameDay = meta && meta.day === utcDay(now);
+  const after = credits
+    ? { remaining: credits.remaining - spent, allowance: Math.round(allowanceCredits * 10) / 10 }
+    : null;
   return {
     results,
     scraped,
@@ -304,6 +309,10 @@ async function fetchAll(products, opts = {}) {
       scrapes: (sameDay ? meta.scrapes || 0 : 0) + scraped,
       credits: (sameDay ? meta.credits || 0 : 0) + spent,
       ...(learnedCost ? { costPerScrape: Number(learnedCost.toFixed(2)) } : {}),
+      // Published so the page can show the budget and grey out its refresh button
+      // rather than firing a run that would defer every card. Not a secret, but it
+      // does put the account balance in a public file.
+      ...(after || {}),
     },
   };
 }

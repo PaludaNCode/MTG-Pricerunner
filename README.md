@@ -22,6 +22,7 @@ cloud/               GitHub Actions fetchers + static site (cloud/web)
   fetch-cardmarket.js  Cardmarket offers via Firecrawl + the credit budget
   cardmarket-parse.js  Cardmarket HTML -> offers (pure, unit-tested)
   verify-mobile.js     UI smoke test (renders at 320/390/1440 px, fails on overflow)
+  verify-refresh.js    behaviour test for the "↻ CM" button (browser, network stubbed)
   fixture-data.json    offline CardTrader test data for CI
   fixture-cardmarket.json  offline Cardmarket test data for CI
 test/                unit tests (node:test, zero deps) — run with `npm test`
@@ -115,6 +116,25 @@ Setup: add the Firecrawl API key as the **`FIRECRAWL_API_KEY`** repo secret
 without it; CardTrader is unaffected either way. Failures never blank a card — the
 previous offers are kept and the run records the error — and a card deferred by the
 budget keeps its prices too, without being marked as an error.
+
+## Refreshing Cardmarket on demand
+
+The header has a **↻ CM** button that triggers a Cardmarket scrape immediately instead
+of waiting for the hourly cron. It sends `workflow_dispatch` with `force: true`, which
+makes that run ignore the TTL and the per-run limit — but **not** the credit allowance
+or the reserve. The worst a button press can do is spend today's allowance sooner; it
+can never overspend the plan. When the allowance is gone the button greys itself out
+and says so, rather than firing a run that would defer every card.
+
+Triggering a workflow needs a GitHub PAT with `Actions: read and write`, and this site
+is public — so the token is **not** in the page. On first click the button prompts for
+one and keeps it in that browser's `localStorage`. Anyone without a token sees the
+button but cannot use it. A token that comes back 401/403 (they expire yearly) is
+discarded automatically so the next click re-prompts.
+
+Use the same fine-grained PAT the pinger uses, or mint another the same way —
+`docs/external-pinger.md` step 1 has the exact settings. After pressing, the page polls
+`cardmarket.json` until the snapshot's timestamp moves, up to three minutes.
 
 ## Branching strategy
 

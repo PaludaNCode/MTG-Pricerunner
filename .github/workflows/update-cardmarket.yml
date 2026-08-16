@@ -11,7 +11,12 @@ name: Update Cardmarket data
 on:
   schedule:
     - cron: "17 * * * *" # hourly, off the round hour where GitHub's scheduler is busiest
-  workflow_dispatch: {} # manual run button
+  workflow_dispatch: # manual run button, and the site's "Refresh now" button
+    inputs:
+      force:
+        description: "Ignore the TTL and per-run limit (the credit allowance still applies)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -61,6 +66,7 @@ jobs:
         run: node cloud/build-cardmarket.js --prev /tmp/prev-cm.json
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          CM_FORCE: ${{ inputs.force }}
       # Same build-artifact pattern as the `data` branch: a single orphan commit,
       # force-pushed every run. Never branch from it or PR into it.
       - name: Publish cardmarket.json to the data-cm branch

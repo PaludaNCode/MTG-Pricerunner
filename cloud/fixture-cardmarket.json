@@ -1,7 +1,7 @@
 {
   "_note": "Offline Cardmarket feed for cloud/verify-mobile.js — mirrors what update-cardmarket.yml publishes to the data-cm branch, including the credit ledger in meta.",
   "updatedAt": "2026-01-01T09:00:00.000Z",
-  "meta": { "day": "2026-01-01", "scrapes": 2, "credits": 10, "costPerScrape": 5 },
+  "meta": { "day": "2026-01-01", "scrapes": 2, "credits": 10, "costPerScrape": 5, "remaining": 964, "allowance": 33.1 },
   "results": [
     {
       "site": "cardmarket",

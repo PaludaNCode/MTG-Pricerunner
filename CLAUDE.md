@@ -38,11 +38,14 @@ npm test
 # Single test file
 node --test test/cards.test.js
 
+# Refresh-button behaviour (browser; every api.github.com call is stubbed)
+node cloud/verify-refresh.js
+
 # Syntax-check everything (same as CI)
 for f in $(git ls-files '*.js'); do node --check "$f"; done
 ```
 
-No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + unit tests + the smoke test above.
+No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + unit tests + both browser checks above.
 
 ## Workflow rules (non-negotiable)
 
@@ -53,6 +56,7 @@ No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + un
 
 - `shared/render.js` — `CardUI.renderGrid(data, opts)` renders the offer grid.
 - `shared/app.js` — page bootstrap (fetch loop, status line). The page configures it with `window.DASH = { url, cmUrl, intervalMs }` and app.js **merges the two feeds** into one `results` array before rendering. Both URLs are hostname-conditional: raw `data`/`data-cm` branch URLs on `github.io`, relative paths on localhost (keeps `verify-mobile.js` offline). The Cardmarket fetch is wrapped in a `.catch(() => null)` — the `data-cm` branch may not exist yet, and a failed scrape must never take the page down. The status line shows CardTrader's timestamp plus a `CM <age>` suffix, because the Cardmarket snapshot legitimately lags by hours.
+- **The "↻ CM" button lives in `app.js`, deliberately not its own file.** The deploy workflow stamps exactly four asset URLs with the commit SHA and `test/deploy-stamp.test.js` asserts that count, so a fifth script would mean touching the workflow, the sed guard and that test. It triggers `update-cardmarket.yml` via `workflow_dispatch` with `force: "true"`. The PAT is prompted for on first click and kept in `localStorage` under `mtg-pricerunner.gh-token` — **never put a token in the page**, the site is public and that PAT can spend real credits. A 401/403 clears the stored token so the next click re-prompts. `cloud/verify-refresh.js` pins all of this in a real browser with the GitHub calls stubbed.
 - `shared/ui.css` — **the base rules are the desktop design and must not change visually.** All phone/tablet adaptation lives in `@media (max-width: ...)` blocks (1100px → 2 grid cols, 700px → 1, 480px → compact, Set column shows the official set code instead of the full variant name).
 - `shared/cards.js` — `normalizeCards(config)` turns the paste-a-URL `config.json` entries into product objects (site, blueprintId, language defaulting). The fetchers consume it.
 - **Two entry points, one per source.** `cloud/build-data.js` (CardTrader → `cloud/web/data.json`, stateless) and `cloud/build-cardmarket.js` (Cardmarket → `cloud/web/cardmarket.json`, carries the credit ledger). `cloud/fetch-cardtrader.js` and `cloud/fetch-cardmarket.js` are modules (`fetchAll(products, opts)`), not scripts — don't run them directly. Don't merge the two entry points back together: one writer per file is what keeps the 2-min job from clobbering the hourly job's ledger.
@@ -68,6 +72,8 @@ Data shape contract (both feeds, consumed by `render.js` after app.js concatenat
 - **The ledger lives in `cardmarket.json` under `meta`** (`{ day, scrapes, credits, costPerScrape }`) and round-trips via `--prev` off the `data-cm` branch; the day fields reset on the UTC boundary. Losing `--prev` restarts the day's allowance *and* makes every card look stale — that is a credit-burn event, which is precisely why Cardmarket got its own file and its own workflow instead of riding along in the 2-min job's `data.json`.
 - **Deferral is stalest-first, and that matters.** When more cards are due than the allowance covers, `fetchAll` sorts the due list by `fetchedAt` ascending (never-fetched first) and takes the top N. Without that the first cards in `config.json` would eat the allowance every day and the tail would never refresh. A deferred card carries its old offers forward with **no** `error` field — it isn't a fault.
 - **Don't count `fetchedAt`s to reconstruct spend.** A failed scrape costs a credit without updating any timestamp, so the explicit counter is the only honest tally.
+- **A forced run (`CM_FORCE=true`, set by the site's button) ignores the TTL and the per-run limit, never the credit allowance.** `ttlMinutes: 0` already means "never reuse" in `isFresh`, so force is just that plus `perRunLimit = products.length`. Keep it that way: on-demand must not be able to outspend the plan, only to spend today's allowance sooner.
+- **`meta` also publishes `remaining` and `allowance`** so the page can grey the button out when the day is spent. That puts the Firecrawl balance in a public file — benign (no credential), but deliberate rather than accidental.
 - **`cardmarketTtlMinutes` is deliberately low (120).** It exists to stop pointless re-scrapes, not to pace spending — the credit allowance does that. Raising the TTL just leaves credits unspent.
 - **A blocked scrape looks like a successful one.** Cloudflare's interstitial is a 200 with a plausible body, so "0 offers" can't distinguish it from an out-of-stock card — hence `looksBlocked()`. On any failure the previous offers are carried forward with the *old* `fetchedAt`, so the card keeps its prices and the next run retries.
 - **Cardmarket language filtering is URL-only** (`?language=7` = Japanese); the offer HTML doesn't expose it, so `offer.language` is always null there. A config test enforces the query parameter.
