@@ -34,7 +34,6 @@
     { "url": "https://www.cardtrader.com/en/cards/288831-guide-of-souls-extended-art-modern-horizons-3-collectors", "group": "Guide of Souls", "variant": "Extended Art Collectors", "code": "MH3" },
     { "url": "https://www.cardtrader.com/en/cards/290402-guide-of-souls-modern-horizons-3-prerelease", "group": "Guide of Souls", "variant": "Prerelease", "code": "PMH3" },
     { "url": "https://www.cardtrader.com/cards/371505-guide-of-souls-store-championship-store-championships", "group": "Guide of Souls", "variant": "Store Championship", "code": "SCH" },
-    { "url": "https://www.cardtrader.com/cards/32843-seeker-of-skybreak-tempest", "group": "Seeker of Skybreak", "variant": "Tempest", "code": "TMP" },
     { "url": "https://www.cardtrader.com/en/cards/147699", "group": "Agadeem's Awakening", "variant": "Prerelease", "code": "PZNR" },
     { "url": "https://www.cardtrader.com/en/cards/147616", "group": "Agadeem's Awakening", "variant": "Promos", "code": "PZNR" },
     { "url": "https://www.cardtrader.com/en/cards/146964", "group": "Agadeem's Awakening", "variant": "Extended Art", "code": "ZNR" },
@@ -58,20 +57,13 @@
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Zendikar/Verdant-Catacombs?language=7", "group": "Verdant Catacombs", "variant": "Zendikar", "code": "ZEN" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Onslaught/Windswept-Heath?language=7", "group": "Windswept Heath", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardmarket.com/en/Magic/Products/Singles/Onslaught/Wooded-Foothills?language=7", "group": "Wooded Foothills", "variant": "Onslaught", "code": "ONS" },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Seeker-of-Skybreak?language=7", "group": "Seeker of Skybreak", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Guide-of-Souls?language=7", "group": "Guide of Souls", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Planar-Nexus?language=7", "group": "Planar Nexus", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Lively-Dirge?language=7", "group": "Lively Dirge", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Into-the-Flood-Maw?language=7", "group": "Into the Flood Maw", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Stormchasers-Talent?language=7", "group": "Stormchaser's Talent", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Memory-Guardian?language=7", "group": "Memory Guardian", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hawkeyes-Bow?language=7", "group": "Hawkeye's Bow", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Shuri-Wakandan-Inventor?language=7", "group": "Shuri, Wakandan Inventor", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Raph-Mikey-Troublemakers?language=7", "group": "Raph & Mikey, Troublemakers", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Loch-Mare?language=7", "group": "Loch Mare", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Sewer-veillance-Cam?language=7", "group": "Sewer Veillance Cam", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hide-on-the-Ceiling?language=7", "group": "Hide on the Ceiling", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Skateboard?language=7", "group": "Skateboard", "variant": "All printings", "allVersions": true }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true }
   ]
 }
