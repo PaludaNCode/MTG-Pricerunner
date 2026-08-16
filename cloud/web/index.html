@@ -18,12 +18,13 @@
        localStorage, never in this page. See app.js. -->
   <span class="refresh-group">
     <input id="cm-token" class="token" type="password" autocomplete="off" spellcheck="false"
-           placeholder="GitHub PAT (Actions: write)" aria-label="GitHub token for the Cardmarket refresh" hidden />
+           placeholder="GitHub token (ghp_… / github_pat_…)" aria-label="GitHub token for the Cardmarket refresh" hidden />
     <button id="cm-token-toggle" class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>
     <button id="cm-refresh" class="refresh" type="button" title="Scrape Cardmarket now">↻ CM</button>
   </span>
 </header>
 <div id="legend" class="legend"></div>
+<div id="notice" class="notice" hidden></div>
 <div id="watching" class="watching"></div>
 <div id="grid"></div>
 

@@ -55,6 +55,14 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
 .legend { color: var(--muted); font-size: .78rem; line-height: 1.5; margin: 0 0 .8rem; }
 .legend .label { color: var(--txt); font-weight: 600; }
 .legend b { color: var(--txt); font-weight: 600; }
+/* Inline feedback for the refresh button. Inline rather than alert(): on a phone a
+   modal covers the very field you need to correct. */
+.notice { margin: 0 0 .9rem; padding: .55rem .8rem; border-radius: 10px; font-size: .82rem; line-height: 1.5;
+  background: var(--card2); border: 1px solid var(--line); color: var(--txt); }
+.notice[hidden] { display: none; }
+.notice.err { border-color: rgba(255,91,82,.45); background: rgba(255,91,82,.08); }
+.notice b { color: var(--accent2); }
+.notice code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .95em; color: var(--accent2); }
 .badges { display: inline-flex; gap: .35rem; align-items: center; }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout: fixed; }
 col.c-price { width: 22%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
