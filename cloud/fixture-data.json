@@ -34,6 +34,19 @@
       ]
     },
     {
+      "site": "cardmarket",
+      "group": "Fixture Card",
+      "variant": "Extended Art",
+      "code": "ZNR",
+      "name": "Fixture Card — Extended Art",
+      "productUrl": "https://example.com/cm/1",
+      "fetchedAt": "2026-01-01T11:40:00.000Z",
+      "offers": [
+        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null },
+        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null }
+      ]
+    },
+    {
       "site": "cardtrader",
       "group": "Empty Watch",
       "variant": "Promos",

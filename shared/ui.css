@@ -24,7 +24,10 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
 .badges { display: inline-flex; gap: .35rem; align-items: center; }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout: fixed; }
 col.c-price { width: 22%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
-col.c-ship { width: 10%; } col.c-set { width: 23%; }
+col.c-ship { width: 10%; } col.c-src { width: 9%; } col.c-set { width: 22%; }
+/* Src holds a 2-letter tag (CT/CM); the default .8rem side padding eats enough of
+   its column that the tag itself ellipsises, so give the text the room instead. */
+th.c-src, td.c-src { padding-left: .35rem; padding-right: .35rem; }
 th, td { text-align: left; padding: .5rem .8rem; border-top: 1px solid #232734; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .4px; padding-right: .3rem; }
 td a { color: var(--accent2); text-decoration: none; }
@@ -72,8 +75,12 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
   table { font-size: .82rem; }
   th, td { padding: .42rem .4rem .42rem .5rem; }
   th { font-size: .64rem; letter-spacing: .2px; }
-  /* phones: show set codes instead of full set names — the freed
-     width keeps Qty visible and Price untruncated. */
+  /* phones: drop Src, show set codes instead of full set names — the freed
+     width keeps Qty visible and Price untruncated. The site is still reachable
+     per row: the Set cell links to that offer's product page.
+     Src cells stay in flow (width/padding 0, content clipped) — display:none
+     would shift later cells into the wrong columns under table-layout: fixed. */
+  col.c-src { width: 0; } th.c-src, td.c-src { padding: 0; }
   col.c-price { width: 29%; } col.c-cond { width: 11%; } col.c-qty { width: 10%; }
   col.c-ship { width: 11%; } col.c-set { width: 15%; }
   .set-full { display: none; } .set-code { display: inline; }

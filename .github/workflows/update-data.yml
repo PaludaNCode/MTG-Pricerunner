@@ -6,7 +6,14 @@ on:
   workflow_dispatch: {} # manual run button + external pinger target
   push:
     branches: [main]
-    paths: ["config.json", "cloud/fetch-cardtrader.js", "shared/cards.js", ".github/workflows/update-data.yml"]
+    paths:
+      - "config.json"
+      - "cloud/build-data.js"
+      - "cloud/fetch-cardtrader.js"
+      - "cloud/fetch-cardmarket.js"
+      - "cloud/cardmarket-parse.js"
+      - "shared/cards.js"
+      - ".github/workflows/update-data.yml"
 
 permissions:
   contents: write # force-push the data branch
@@ -28,10 +35,24 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      - name: Fetch CardTrader data -> cloud/web/data.json
-        run: node cloud/fetch-cardtrader.js
+      # The previous data.json feeds the Cardmarket TTL: results younger than
+      # config.cardmarketTtlMinutes are reused instead of costing a Firecrawl credit.
+      # Read straight off the data branch (not raw.githubusercontent) so a CDN-stale
+      # copy can't trigger a needless re-scrape. First ever run has no data branch.
+      - name: Pull the previous data.json (for the Cardmarket TTL)
+        run: |
+          if git fetch --depth=1 origin data 2>/dev/null &&
+             git show FETCH_HEAD:data.json > /tmp/prev-data.json 2>/dev/null; then
+            echo "previous data.json: $(wc -c < /tmp/prev-data.json) bytes"
+          else
+            rm -f /tmp/prev-data.json
+            echo "no previous data.json — every Cardmarket card will be scraped"
+          fi
+      - name: Fetch card data -> cloud/web/data.json
+        run: node cloud/build-data.js --prev /tmp/prev-data.json
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       # The data branch is a build artifact: a single orphan commit, force-pushed
       # every run so history never grows. Never branch from it or PR into it.
       - name: Publish data.json to the data branch

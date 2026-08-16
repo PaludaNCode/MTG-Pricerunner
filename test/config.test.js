@@ -39,6 +39,26 @@ test("no duplicate cardtrader entries (same blueprintId)", () => {
   assert.equal(new Set(ids).size, ids.length, "duplicate blueprintId in config.json");
 });
 
+// Cardmarket has no language property in its offer HTML — the ?language= query
+// parameter on the URL is the only filter, so a paste that drops it silently
+// starts watching every language at once.
+test("every cardmarket entry filters by language in its URL", () => {
+  const cfg = JSON.parse(raw);
+  for (const p of normalizeCards(cfg).filter((p) => p.site === "cardmarket")) {
+    assert.match(p.productUrl, /[?&]language=\d+/, `no ?language= filter on ${p.productUrl}`);
+  }
+});
+
+// build-data.js keys results by site+productUrl, so a duplicate URL would collapse
+// into one fetch rendered twice.
+test("no duplicate cardmarket entries (same URL)", () => {
+  const cfg = JSON.parse(raw);
+  const urls = normalizeCards(cfg)
+    .filter((p) => p.site === "cardmarket")
+    .map((p) => p.productUrl);
+  assert.equal(new Set(urls).size, urls.length, "duplicate Cardmarket URL in config.json");
+});
+
 test("every card entry has an official set code (shown on phones)", () => {
   const cfg = JSON.parse(raw);
   for (const p of normalizeCards(cfg)) {
