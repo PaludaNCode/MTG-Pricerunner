@@ -98,8 +98,12 @@ function check(ok, msg) {
 
   console.log("each card says when it was last scraped");
   check(
-    (await page.locator("#grid .card .age").count()) === 3,
-    "an age chip on every Cardmarket card, and none on the CardTrader-only one",
+    (await page.locator("#grid .card .age").count()) === 4,
+    "an age chip on every Cardmarket-watched card, including one never scraped",
+  );
+  check(
+    (await page.locator("#grid .card", { hasText: "Skateboard" }).locator(".age.new").count()) === 1,
+    "a card the config watches but has never scraped says 'new', not nothing",
   );
   check(
     (await page.locator("#grid .card", { hasText: "Seeker of Skybreak" }).locator(".age").count()) === 0,
@@ -110,8 +114,8 @@ function check(ok, msg) {
     "the chip's tooltip gives the exact timestamp",
   );
   check(
-    (await page.locator("#legend").textContent()).includes("oldest card first"),
-    "the legend explains the refresh model",
+    (await page.locator("#legend").textContent()).includes("only when you ask"),
+    "the legend says Cardmarket is on-demand, not scheduled",
   );
   check(
     (await page.locator("#updated").textContent()).includes("credits today"),
@@ -123,7 +127,7 @@ function check(ok, msg) {
   page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "test-token-123")`);
   const boxes = page.locator("#grid .card .pick");
   const cardCount = await page.locator("#grid .card").count();
-  check((await boxes.count()) === cardCount - 1, "every card gets a tick box except the CardTrader-only one");
+  check((await boxes.count()) === cardCount - 1, "every Cardmarket-watched card gets a tick box, including never-scraped ones");
   check(
     (await page.locator("#grid .card", { hasText: "Seeker of Skybreak" }).locator(".pick").count()) === 0,
     "a card with no Cardmarket entry cannot be picked — nothing to refresh",

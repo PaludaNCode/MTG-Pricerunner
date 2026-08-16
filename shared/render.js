@@ -26,8 +26,8 @@
   // Cardmarket freshness for one card. Unlike CardTrader (refetched every couple of
   // minutes, for free), a Cardmarket card is scraped only when the credit budget reaches
   // it — which can be hours or days — so each card has to say when that last happened.
-  function cmChip(entries, pending) {
-    if (!entries.length) return "";
+  function cmChip(entries, pending, refreshable) {
+    if (!refreshable) return "";
     if (pending) return '<span class="age pending" title="Refresh running — this card is in the queue">···</span>';
     const failed = entries.find((p) => p.error);
     const fetchedAt = entries.map((p) => p.fetchedAt).filter(Boolean).sort().pop();
@@ -107,12 +107,17 @@
       // Only a card with a Cardmarket entry can be refreshed on demand — CardTrader
       // is free and already refreshes everything every couple of minutes.
       const cmEntries = groups[g].filter((p) => p.site === "cardmarket");
-      cards.push({ g, merged, refreshable: cmEntries.length > 0, cmEntries });
+      cards.push({ g, merged, cmEntries });
     }
 
     const selected = opts.selected || new Set();
     const pending = opts.pending || new Set();
-    for (const { g, merged, refreshable, cmEntries } of cards) {
+    // Cards Cardmarket can refresh, per config.json (published in the CardTrader feed).
+    // Falling back to "has scraped data" alone would hide every tick box until the
+    // first scrape had already happened.
+    const cmCards = opts.cardmarketCards ? new Set(opts.cardmarketCards) : null;
+    for (const { g, merged, cmEntries } of cards) {
+      const refreshable = cmCards ? cmCards.has(g) : cmEntries.length > 0;
       const hiddenCount = merged.length - MAX_VISIBLE_ROWS;
       const collapsible = hiddenCount > 0;
       const collapsed = collapsible && !expandedGroups.has(g);
@@ -130,7 +135,7 @@
 
       const card = document.createElement("div");
       card.className = "card" + (collapsed ? " is-collapsed" : "");
-      card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges">${cmChip(cmEntries, pending.has(g))}<span class="badge">${merged.length}</span></span></h2>
+      card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges">${cmChip(cmEntries, pending.has(g), refreshable)}<span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}${toggle}</table>`;
       const box = card.querySelector(".pick");
       if (box && opts.onToggle) box.addEventListener("change", () => opts.onToggle(g, box.checked));

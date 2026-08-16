@@ -1,39 +1,26 @@
 name: Update Cardmarket data
 
-# Separate from "Update card data" on purpose. CardTrader is a free API call every
-# couple of minutes; Cardmarket is metered scraping through Firecrawl, so it gets its
-# own slow cron, its own file and its own branch. Nothing this job owns is ever
-# touched by the fast job — in particular the credit ledger in `meta`.
+# ON DEMAND ONLY — there is deliberately no `schedule:` and no `push:` trigger.
+# Every Cardmarket scrape costs Firecrawl credits, so nothing here may start itself:
+# the only way in is the site's "↻ CM" button or the Run workflow button, both of
+# which are workflow_dispatch. Adding a cron back would silently spend money.
 #
-# Hourly is the *ceiling*, not the rate: fetch-cardmarket.js decides how many cards it
-# can actually afford on each wake (TTL, per-run limit, and a daily credit allowance
-# derived from the live balance). Most wakes will scrape nothing.
+# Separate from "Update card data" for the same reason: CardTrader is a free API call
+# every couple of minutes, and it must never be able to touch this job's credit ledger.
 on:
-  schedule:
-    - cron: "17 * * * *" # hourly, off the round hour where GitHub's scheduler is busiest
-  workflow_dispatch: # manual run button, and the site's "Refresh now" button
+  workflow_dispatch: # the site's "↻ CM" button, and Actions -> Run workflow
     inputs:
       force:
         description: "Ignore the TTL and per-run limit (the credit allowance still applies)"
         type: boolean
-        default: false
+        default: true
       cards:
         description: "Comma-separated card names to scrape. Empty = every card, stalest first."
         type: string
         default: ""
-  push:
-    branches: [main]
-    paths:
-      - "config.json"
-      - "cloud/build-cardmarket.js"
-      - "cloud/fetch-cardmarket.js"
-      - "cloud/cardmarket-parse.js"
-      - "shared/cards.js"
-      - ".github/workflows/update-cardmarket.yml"
 
 permissions:
   contents: write # force-push the data-cm branch
-  actions: write # keepalive step re-enables this workflow
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -85,19 +72,5 @@ jobs:
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data-cm
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      # Scheduled workflows are auto-disabled after 60 days without repo activity;
-      # re-enabling on every run resets that clock deterministically. GitHub's API
-      # 503s in short bursts, so ride those out instead of failing after the data
-      # has already been published.
-      - name: Keepalive
-        run: |
-          for delay in 2 4 8; do
-            if gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-cardmarket.yml/enable"; then
-              exit 0
-            fi
-            echo "keepalive attempt failed; retrying in ${delay}s"
-            sleep "$delay"
-          done
-          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/update-cardmarket.yml/enable"
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # No keepalive step: that exists to stop GitHub auto-disabling *scheduled*
+      # workflows after 60 days of inactivity, and this one has no schedule.
