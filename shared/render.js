@@ -89,16 +89,25 @@
     let totalOffers = 0;
     const empty = []; const errored = new Set(); const cards = [];
     for (const g of order) {
+      // An all-versions page for a card with one printing yields no per-row set, so the
+      // offer would fall back to the entry's own label — "All printings" — which says
+      // nothing. When CardTrader watches exactly one printing of this card, that is the
+      // printing, so borrow its name and code.
+      const ctPrintings = groups[g].filter((p) => p.site === "cardtrader");
+      const distinct = new Set(ctPrintings.map((p) => `${p.variant}|${p.code}`));
+      const solePrinting = distinct.size === 1 ? ctPrintings[0] : null;
+
       let merged = [];
       for (const p of groups[g]) {
         if (p.error) errored.add(g);
+        const fallback = p.allVersions && solePrinting ? solePrinting : p;
         // An offer may carry its own set: Cardmarket's all-versions page returns one
         // table mixing every printing, so the row wins over the entry when it says so.
         for (const o of p.offers || [])
           merged.push({
             ...o,
-            _variant: o.variant || p.variant || "",
-            _code: o.code || (o.variant ? "" : p.code || ""),
+            _variant: o.variant || fallback.variant || "",
+            _code: o.code || (o.variant ? "" : fallback.code || ""),
             _site: p.site,
             _url: o.productUrl || p.productUrl,
           });

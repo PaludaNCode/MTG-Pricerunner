@@ -16,20 +16,22 @@
 // left in the billing period. Under-spending one day raises tomorrow's allowance;
 // overspending lowers it. Brakes, weakest to strongest:
 //
-//   1. TTL           — a result younger than `cardmarketTtlMinutes` is reused, not re-fetched.
-//   2. Per-run limit — at most `cardmarketPerRunLimit` scrapes per wake, so an hourly job
-//                      can't spend the whole day's allowance in its first run.
-//   3. Credit/day    — remaining balance ÷ days left in the period, minus what today
-//                      already cost. This is the real ceiling.
-//   4. Credit floor  — never spend below `cardmarketMinCredits`, so the plan can't be zeroed.
+//   1. Credit/day    — remaining balance ÷ days left in the period, minus what today
+//                      already cost. This is the real ceiling for every run.
+//   2. Credit floor  — never spend below `cardmarketMinCredits`, so the plan can't be zeroed.
+//
+// A TTL and a per-run limit also exist as defaults here, but every real run is started
+// with force=true (the site's button, and the workflow's own default), which bypasses
+// both — so they only apply if someone deliberately unticks force in the Actions UI.
+// They were dropped from config.json rather than left there looking like live settings.
 const { parseCardmarket, looksBlocked } = require("./cardmarket-parse");
 
 // FIRECRAWL_API_URL matches the official SDK's env var; the tests point it at a stub.
 const BASE = (process.env.FIRECRAWL_API_URL || "https://api.firecrawl.dev").replace(/\/$/, "");
 const API = BASE + "/v2/scrape";
 const CREDITS_API = BASE + "/v2/team/credit-usage";
-const DEFAULT_TTL_MINUTES = 360;
-const DEFAULT_DAILY_BUDGET = 12; // fallback cap when the balance can't be read
+const DEFAULT_TTL_MINUTES = 120;
+const DEFAULT_DAILY_BUDGET = 6; // fallback cap, used only when the balance can't be read
 const DEFAULT_MIN_CREDITS = 25;
 const DEFAULT_PER_RUN_LIMIT = 2;
 const DEFAULT_MONTHLY_CREDITS = 1000; // used only when the API reports no billing period

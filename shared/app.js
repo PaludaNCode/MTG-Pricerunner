@@ -39,15 +39,18 @@
         onToggle,
       });
 
+      // Set before renderLegend: it reports how many cards "Select all" would cover,
+      // so assigning afterwards left the link missing until the next poll.
+      allCards = (ct && ct.meta && ct.meta.cardmarketCards) || [];
+      lastMeta = cm && cm.meta;
+      // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
+      window.__cmUpdatedAt = cm && cm.updatedAt;
+
       $("updated").textContent =
         (data.updatedAt ? "updated " + new Date(data.updatedAt).toLocaleString() : "starting…") +
         " · " + totalOffers + " offers" +
         cmSummary(cm);
       renderLegend(cm);
-
-      // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
-      window.__cmUpdatedAt = cm && cm.updatedAt;
-      lastMeta = cm && cm.meta;
       syncButton();
     } catch (e) {
       $("updated").textContent = "load failed: " + e;
@@ -83,10 +86,19 @@
       (affordable != null
         ? `, and today's budget still covers about <b>${affordable} card${affordable === 1 ? "" : "s"}</b>.`
         : ". CardTrader keeps updating on its own, for free.") +
+      // Ticking two dozen boxes by hand is the obvious thing to want to skip. The cost
+      // is shown up front because selecting everything is the most expensive press
+      // available, and the button gives no second chance to reconsider.
+      (cfg.dispatch && allCards.length
+        ? ` <a href="#" id="cm-all">${picks.size >= allCards.length ? "Clear selection" : `Select all ${allCards.length}`}</a>` +
+          (picks.size >= allCards.length
+            ? ""
+            : ` <span class="muted">(~${Math.round(allCards.length * (cost || 1))} credits)</span>`)
+        : "") +
       // Reading the balance is not billed, so this is genuinely free — worth offering,
       // since otherwise the only way to refresh that figure is to spend credits.
       (cfg.dispatch && getToken()
-        ? ' <a href="#" id="cm-balance">Check credit balance</a> <span class="muted">(free)</span>'
+        ? ' · <a href="#" id="cm-balance">Check credit balance</a> <span class="muted">(free)</span>'
         : "");
   }
 
@@ -126,6 +138,9 @@
   let pending = new Set();
   // A copy of cardmarket.json read through the API right after a run, ahead of the CDN.
   let cmFresh = null;
+  // Every Cardmarket-watched card name, from data.json's meta. Used by "Select all" so
+  // it covers the configured list, not just the cards currently drawing a table.
+  let allCards = [];
 
   const getToken = () => (localStorage.getItem(TOKEN_KEY) || "").trim();
 
@@ -434,9 +449,19 @@
     const legendEl = $("legend");
     if (legendEl) {
       legendEl.addEventListener("click", (e) => {
-        if (e.target && e.target.id === "cm-balance") {
+        if (!e.target) return;
+        if (e.target.id === "cm-balance") {
           e.preventDefault();
           onRefresh("balance");
+        }
+        if (e.target.id === "cm-all") {
+          e.preventDefault();
+          // Toggle: all selected -> clear, otherwise select everything configured.
+          const selectAll = picks.size < allCards.length;
+          picks.clear();
+          if (selectAll) allCards.forEach((g) => picks.add(g));
+          localStorage.setItem(PICKS_KEY, JSON.stringify([...picks]));
+          refresh(); // repaint the tick boxes, the button count and this link
         }
       });
     }
