@@ -112,3 +112,19 @@ test("a seller link is never mistaken for a printing link", () => {
   `));
   assert.equal(o.variant, null, "only /Magic/Products/Singles/ links identify a printing");
 });
+
+test("Universes Beyond set names lose the 'Magic The Gathering' prefix", () => {
+  // Real Cardmarket path shape: /Products/Singles/Magic-The-Gathering-Marvel-Super-Heroes/…
+  const [o] = parseCardmarket(row(1, `
+    <a href="/en/Magic/Products/Singles/Magic-The-Gathering-Marvel-Super-Heroes/Hawkeyes-Bow">MSH</a>
+    <span class="fw-bold">9,00 €</span>
+  `));
+  assert.equal(o.variant, "Marvel Super Heroes", "the brand prefix would crowd out the Set column");
+
+  // A set that merely starts with a similar word keeps its name intact.
+  const [o2] = parseCardmarket(row(1, `
+    <a href="/en/Magic/Products/Singles/Magic-Origins/Some-Card">ORI</a>
+    <span class="fw-bold">1,00 €</span>
+  `));
+  assert.equal(o2.variant, "Magic Origins");
+});

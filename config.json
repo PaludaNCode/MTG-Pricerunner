@@ -66,6 +66,9 @@
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Lively-Dirge?language=7", "group": "Lively Dirge", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Into-the-Flood-Maw?language=7", "group": "Into the Flood Maw", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Stormchasers-Talent?language=7", "group": "Stormchaser's Talent", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Memory-Guardian?language=7", "group": "Memory Guardian", "variant": "All printings", "allVersions": true }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Memory-Guardian?language=7", "group": "Memory Guardian", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hawkeyes-Bow?language=7", "group": "Hawkeye's Bow", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Shuri-Wakandan-Inventor?language=7", "group": "Shuri, Wakandan Inventor", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Raph-Mikey-Troublemakers?language=7", "group": "Raph & Mikey, Troublemakers", "variant": "All printings", "allVersions": true }
   ]
 }

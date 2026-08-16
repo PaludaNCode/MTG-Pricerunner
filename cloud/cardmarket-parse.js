@@ -19,7 +19,14 @@
 // link — the row IS the product — so `variant`/`productUrl` come back null and the
 // caller falls back to the config entry's own set. That keeps both shapes working.
 const ROW_PRODUCT_LINK = /href="(\/[a-z]{2}\/Magic\/Products\/Singles\/([^/"]+)\/[^"?#]+)"/;
-const unslug = (s) => decodeURIComponent(s).replace(/-/g, " ").trim();
+// Cardmarket prefixes some Universes Beyond expansions with the whole brand, e.g.
+// "Magic-The-Gathering-Marvel-Super-Heroes". Left alone that fills the Set column with
+// six words of boilerplate and pushes the actual set name out of view.
+const unslug = (s) =>
+  decodeURIComponent(s)
+    .replace(/-/g, " ")
+    .replace(/^Magic:?\s+The\s+Gathering\s+/i, "")
+    .trim();
 
 // Normalized offer shape (same contract as the CardTrader fetcher):
 // { price:Number|null, priceStr, foil:Bool|null, condition, qty, seller,
