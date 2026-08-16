@@ -48,14 +48,37 @@ const unslug = (s) => stripBrand(decodeURIComponent(s).replace(/-/g, " "));
 // Normalized offer shape (same contract as the CardTrader fetcher):
 // { price:Number|null, priceStr, foil:Bool|null, condition, qty, seller,
 //   location, language:String|null, shipsToMe:Bool|null, variant, productUrl }
+// Where the offer list stops. The last row has no following row to bound it, so its
+// block would otherwise run to the end of the document and absorb the footer and
+// "related products" links — which is how one offer per card ended up labelled with a
+// printing taken from page furniture rather than from the row itself.
+const AFTER_TABLE = /<\/table>|<footer|id="pagination"|class="[^"]*pagination|js-loadmore/i;
+const LAST_ROW_FALLBACK_CHARS = 6000;
+
+function endOfLastRow(html, start, prevBlockLengths) {
+  const rest = html.slice(start);
+  const marker = rest.search(AFTER_TABLE);
+  // Rows are near-identical in size; page furniture is not. Use the widest real row
+  // seen as the bound when there is no marker to cut at.
+  const cap = prevBlockLengths.length
+    ? Math.ceil(Math.max(...prevBlockLengths) * 1.5)
+    : LAST_ROW_FALLBACK_CHARS;
+  const end = marker !== -1 ? Math.min(marker, cap) : Math.min(rest.length, cap);
+  return start + end;
+}
+
 function parseCardmarket(html) {
   const offers = [];
   const rowStarts = [];
   const re = /id="articleRow(\d+)"/g;
   let m;
   while ((m = re.exec(html)) !== null) rowStarts.push(m.index);
+  const blockLengths = [];
   for (let i = 0; i < rowStarts.length; i++) {
-    const block = html.slice(rowStarts[i], i + 1 < rowStarts.length ? rowStarts[i + 1] : html.length);
+    const end =
+      i + 1 < rowStarts.length ? rowStarts[i + 1] : endOfLastRow(html, rowStarts[i], blockLengths);
+    const block = html.slice(rowStarts[i], end);
+    blockLengths.push(block.length);
     // Cardmarket prints European numbers: dot groups thousands, comma decimals.
     const pm = block.match(/fw-bold[^>]*>\s*([\d.]+),(\d{2})\s*(?:&euro;|€)/);
     let price = null;

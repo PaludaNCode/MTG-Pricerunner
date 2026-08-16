@@ -162,3 +162,36 @@ test("a non-expansion tooltip is never mistaken for a set", () => {
   `));
   assert.equal(o.variant, null, "only tags mentioning 'expansion' count");
 });
+
+test("the last row stops at the table, not at the end of the page", () => {
+  // Every row but the last is bounded by the next one. The last had nothing to stop it,
+  // so it swallowed the footer — and one offer per card ended up wearing a set name
+  // lifted from a "related products" link instead of from its own row.
+  const html =
+    row(1, '<span class="fw-bold">10,00 €</span><a href="/en/Magic/Users/S1">S1</a>') +
+    row(2, '<span class="fw-bold">12,00 €</span><a href="/en/Magic/Users/S2">S2</a>') +
+    '</table><footer><a href="/en/Magic/Products/Singles/Modern-Horizons-2/Arid-Mesa">also</a></footer>';
+
+  const [a, b] = parseCardmarket(html);
+  assert.equal(a.variant, null);
+  assert.equal(b.variant, null, "the footer's printing must not attach to the last offer");
+  assert.equal(b.seller, "S2", "and the row's own fields still parse");
+  assert.equal(b.price, 12);
+});
+
+test("a genuine set on the last row still resolves", () => {
+  const html =
+    row(1, '<a href="/en/Magic/Products/Singles/Onslaught/Wooded-Foothills">a</a><span class="fw-bold">1,00 €</span>') +
+    row(2, '<a href="/en/Magic/Products/Singles/Zendikar/Arid-Mesa">b</a><span class="fw-bold">2,00 €</span>') +
+    "<footer>junk</footer>";
+  const [a, b] = parseCardmarket(html);
+  assert.equal(a.variant, "Onslaught");
+  assert.equal(b.variant, "Zendikar", "bounding the last row must not blind it to its own link");
+});
+
+test("a single-row page is bounded by size when there is no table marker", () => {
+  const html = row(1, '<span class="fw-bold">5,00 €</span>') + "x".repeat(20000) +
+    '<a href="/en/Magic/Products/Singles/Modern-Horizons-2/Arid-Mesa">far away</a>';
+  const [o] = parseCardmarket(html);
+  assert.equal(o.variant, null, "a link 20k characters later is page furniture, not this row");
+});

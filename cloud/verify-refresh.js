@@ -217,6 +217,31 @@ function check(ok, msg) {
   check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "and the button still counts them");
   await page.close();
 
+  console.log("select all / clear toggles every configured card at once");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
+  check((await page.locator("#cm-all").count()) === 1, "the legend offers a select-all link");
+  const allLabel = await page.locator("#cm-all").textContent();
+  check(/Select all 4\b/.test(allLabel), "it names how many are configured: " + allLabel);
+  check(
+    (await page.locator("#legend").textContent()).includes("credits)"),
+    "and what selecting them all would cost",
+  );
+
+  await page.locator("#cm-all").click();
+  await page.waitForTimeout(400);
+  check((await page.locator("#cm-refresh").textContent()).includes("(4)"), "all four are picked");
+  check(
+    (await page.locator("#grid .card .pick:checked").count()) === 4,
+    "every Cardmarket-watched card is ticked",
+  );
+  check((await page.locator("#cm-all").textContent()).includes("Clear"), "the link flips to Clear");
+
+  await page.locator("#cm-all").click();
+  await page.waitForTimeout(400);
+  check((await page.locator("#grid .card .pick:checked").count()) === 0, "clicking again clears them");
+  check((await page.locator("#cm-refresh").textContent()).trim() === "↻ CM", "and the count goes away");
+  await page.close();
+
   console.log("the balance check runs the workflow without scraping");
   page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
   check((await page.locator("#cm-balance").count()) === 1, "the legend offers a free balance check");
