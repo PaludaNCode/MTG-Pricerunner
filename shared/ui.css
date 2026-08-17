@@ -22,8 +22,33 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
   padding: .2rem .6rem; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
 .refresh:hover:not(:disabled) { background: rgba(54,214,195,.2); }
 .refresh:disabled { color: var(--muted); background: transparent; border-color: var(--line); cursor: default; }
-.refresh-group { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 .refresh.key { padding: .2rem .45rem; }
+/* Control strip. Sits directly under the header — the negative top margin cancels the
+   header's bottom margin so the two read as one band — and holds both things that
+   decide what a refresh does: the source filter (free, client-side) on the left and
+   the selection plus ↻ CM (spends credits) on the right. */
+.controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin: -1rem -1rem .9rem; padding: .5rem 1.2rem;
+  background: rgba(0,0,0,.22); border-bottom: 1px solid var(--line); }
+.ctl-group { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+/* Needed because the class above would otherwise beat the UA rule for [hidden] —
+   app.js hides this whole half when no refresh target is configured. */
+.ctl-group[hidden] { display: none; }
+.ctl-label { font-size: .7rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.ctl-count { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ctl-count b { color: var(--txt); font-weight: 600; }
+.ctl-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 .2rem; }
+/* Segmented source filter: one control, one active state, no hidden mode. */
+.seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.seg button { font: inherit; font-size: .75rem; font-weight: 600; color: var(--muted);
+  background: none; border: 0; border-radius: 999px; padding: .18rem .7rem; cursor: pointer; white-space: nowrap; }
+.seg button:hover { color: var(--txt); }
+.seg button[aria-pressed="true"] { background: rgba(139,124,255,.22); color: var(--txt); box-shadow: inset 0 0 0 1px rgba(139,124,255,.45); }
+/* Neutral pill button — deliberately quieter than .refresh, which spends credits. */
+.btn { font: inherit; font-size: .75rem; font-weight: 600; color: var(--muted); background: rgba(255,255,255,.03);
+  border: 1px solid var(--line); border-radius: 999px; padding: .2rem .65rem; cursor: pointer; white-space: nowrap; }
+.btn:hover:not(:disabled) { color: var(--txt); border-color: #3a4252; }
+.btn:disabled { opacity: .4; cursor: default; }
 /* Token entry. Deliberately plain and narrow — it is used once per browser. */
 .token { font: inherit; font-size: .75rem; width: 12rem; max-width: 100%; color: var(--txt);
   background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 999px; padding: .2rem .6rem; }
@@ -72,6 +97,9 @@ table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout:
    it holds the longest strings ("Extended Art Collectors") and is the link out. */
 col.c-price { width: 21%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
 col.c-ship { width: 9%; } col.c-src { width: 9%; } col.c-set { width: 42%; }
+/* Filtering to one source drops the Src column (every row would say the same thing),
+   so its 9% has to be given away or the widths stop summing to 100. Set takes it. */
+body.one-source col.c-set { width: 51%; }
 /* Src holds a 2-letter tag (CT/CM); the default .8rem side padding eats enough of
    its column that the tag itself ellipsises, so give the text the room instead. */
 th.c-src, td.c-src { padding-left: .35rem; padding-right: .35rem; }
@@ -113,6 +141,14 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
 @media (max-width: 480px) {
   body { padding: 0 .55rem 1.5rem; }
   header { margin: 0 -.55rem .8rem; padding: .55rem .7rem; gap: .5rem .7rem; }
+  /* The strip wraps to two lines here: filter on the first, selection on the second.
+     Margins track the header's so the band still meets it edge to edge. */
+  .controls { margin: -.8rem -.55rem .7rem; padding: .45rem .7rem; gap: .4rem .45rem; }
+  .ctl-label { font-size: .64rem; }
+  /* Two rows, not three: the selection half only fits on one line if the readout
+     drops to its shortest form and the divider goes. */
+  .ctl-more { display: none; }
+  .ctl-sep { display: none; }
   header h1 { font-size: 1rem; }
   header h1 .sub { display: block; margin-left: 0; font-size: .72rem; }
   .meta { font-size: .72rem; }
@@ -128,6 +164,7 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
      out of Seller (the only flexing column) and a little off Ship and Set. */
   col.c-price { width: 26%; } col.c-cond { width: 12%; } col.c-qty { width: 9%; }
   col.c-ship { width: 9%; } col.c-src { width: 10%; } col.c-set { width: 34%; }
+  body.one-source col.c-set { width: 44%; }
   th.c-src, td.c-src { padding-left: .2rem; padding-right: .2rem; font-size: .72rem; }
   .set-full { display: none; } .set-code { display: inline; }
 }

@@ -217,14 +217,15 @@ function check(ok, msg) {
   check((await page.locator("#cm-refresh").textContent()).includes("(2)"), "and the button still counts them");
   await page.close();
 
-  console.log("select all / clear toggles every configured card at once");
+  console.log("select all / clear are buttons in the control strip, not words in the legend");
   page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
-  check((await page.locator("#cm-all").count()) === 1, "the legend offers a select-all link");
-  const allLabel = await page.locator("#cm-all").textContent();
-  check(/Select all 4\b/.test(allLabel), "it names how many are configured: " + allLabel);
+  check((await page.locator(".controls #cm-all").count()) === 1, "the strip holds a Select all button");
+  check((await page.locator(".controls #cm-none").count()) === 1, "and a Clear button");
+  check((await page.locator("#legend #cm-all").count()) === 0, "the legend no longer hides one in its prose");
+  check(await page.locator("#cm-none").isDisabled(), "Clear is dead while nothing is ticked");
   check(
-    (await page.locator("#legend").textContent()).includes("credits)"),
-    "and what selecting them all would cost",
+    (await page.locator("#pick-count").textContent()).includes("stalest"),
+    "the readout says what an untouched selection does: " + (await page.locator("#pick-count").textContent()),
   );
 
   await page.locator("#cm-all").click();
@@ -234,12 +235,64 @@ function check(ok, msg) {
     (await page.locator("#grid .card .pick:checked").count()) === 4,
     "every Cardmarket-watched card is ticked",
   );
-  check((await page.locator("#cm-all").textContent()).includes("Clear"), "the link flips to Clear");
+  const readout = await page.locator("#pick-count").textContent();
+  check(/4 of 4 selected/.test(readout), "the readout counts them: " + readout);
+  check(/~20 credits/.test(readout), "and prices the press before it happens: " + readout);
+  check(await page.locator("#cm-all").isDisabled(), "Select all has nothing left to do");
 
-  await page.locator("#cm-all").click();
+  await page.locator("#cm-none").click();
   await page.waitForTimeout(400);
-  check((await page.locator("#grid .card .pick:checked").count()) === 0, "clicking again clears them");
+  check((await page.locator("#grid .card .pick:checked").count()) === 0, "Clear unticks them");
   check((await page.locator("#cm-refresh").textContent()).trim() === "↻ CM", "and the count goes away");
+  check(await page.locator("#cm-none").isDisabled(), "Clear disables itself again");
+  await page.close();
+
+  console.log("the source filter narrows the grid without refetching anything");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
+  // Any network call now would be a bug: both feeds are already in memory.
+  await page.route("**/*.json", (route) => route.abort());
+  const srcCount = () => page.locator("#grid table td.c-src").count();
+  const cmRows = () => page.locator("#grid table td.c-src", { hasText: "CM" }).count();
+  check((await cmRows()) > 0, "both sources show by default");
+  check((await page.locator('#src-filter button[data-src="all"]').getAttribute("aria-pressed")) === "true", "Both is the default segment");
+
+  await page.locator('#src-filter button[data-src="cardtrader"]').click();
+  await page.waitForTimeout(200);
+  check((await srcCount()) === 0, "one source on screen means the Src column is dropped");
+  check(
+    (await page.locator("#grid .card", { hasText: "Runehorn Hellkite" }).locator("td").count()) > 0,
+    "CardTrader offers are still there",
+  );
+  check(
+    (await page.evaluate(() => document.body.classList.contains("one-source"))),
+    "body.one-source is set so the column widths still sum to 100",
+  );
+  check(
+    (await page.locator("#grid .card", { hasText: "Runehorn Hellkite" }).locator(".pick").count()) === 1,
+    "the tick box survives the filter — it refreshes Cardmarket, whatever is on screen",
+  );
+
+  await page.locator('#src-filter button[data-src="cardmarket"]').click();
+  await page.waitForTimeout(200);
+  check(
+    (await page.locator("#grid .card", { hasText: "Seeker of Skybreak" }).count()) === 0,
+    "a card with no Cardmarket offers drops out of the grid",
+  );
+  check(
+    (await page.locator("#watching").textContent()).includes("no Cardmarket offers"),
+    "and is listed as filtered out, not as broken: " + (await page.locator("#watching .label").textContent()),
+  );
+
+  await page.unroute("**/*.json"); // the reload needs the feeds back
+  await page.reload();
+  await page.waitForSelector("#grid .card");
+  check(
+    (await page.locator('#src-filter button[data-src="cardmarket"]').getAttribute("aria-pressed")) === "true",
+    "the choice survives a reload",
+  );
+  await page.locator('#src-filter button[data-src="all"]').click();
+  await page.waitForTimeout(200);
+  check((await srcCount()) > 0, "Both brings the Src column back");
   await page.close();
 
   console.log("the balance check runs the workflow without scraping");

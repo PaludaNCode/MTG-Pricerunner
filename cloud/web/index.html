@@ -13,16 +13,31 @@
   <span class="live"><span class="dot"></span>live</span>
   <span class="spacer"></span>
   <span id="updated" class="meta">loading…</span>
-  <!-- On-demand Cardmarket scrape. Only usable by someone holding a GitHub PAT with
-       Actions: write — typed into the field below and kept in this browser's
-       localStorage, never in this page. See app.js. -->
-  <span class="refresh-group">
+</header>
+<!-- Control strip: everything that decides what the next refresh shows and costs.
+     Left is free (a client-side filter over the merged feeds); right spends credits.
+     The scrape is only usable by someone holding a GitHub PAT with Actions: write —
+     typed into the field here and kept in this browser's localStorage, never in this
+     page. app.js wires all of it. -->
+<div class="controls">
+  <span class="ctl-label" id="src-label">Source</span>
+  <span id="src-filter" class="seg" role="group" aria-labelledby="src-label">
+    <button type="button" data-src="all" aria-pressed="true">Both</button>
+    <button type="button" data-src="cardtrader" aria-pressed="false" title="CardTrader offers only">CT</button>
+    <button type="button" data-src="cardmarket" aria-pressed="false" title="Cardmarket offers only">CM</button>
+  </span>
+  <span class="spacer"></span>
+  <span id="cm-group" class="ctl-group">
+    <span id="pick-count" class="ctl-count"></span>
+    <button id="cm-all" class="btn" type="button" title="Tick every Cardmarket-watched card">Select all</button>
+    <button id="cm-none" class="btn" type="button" title="Untick every card">Clear</button>
+    <span class="ctl-sep"></span>
     <input id="cm-token" class="token" type="password" autocomplete="off" spellcheck="false"
            placeholder="GitHub token (ghp_… / github_pat_…)" aria-label="GitHub token for the Cardmarket refresh" hidden />
     <button id="cm-token-toggle" class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>
     <button id="cm-refresh" class="refresh" type="button" title="Scrape Cardmarket now">↻ CM</button>
   </span>
-</header>
+</div>
 <div id="legend" class="legend"></div>
 <div id="notice" class="notice" hidden></div>
 <div id="watching" class="watching"></div>

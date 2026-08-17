@@ -1,13 +1,15 @@
 // Dashboard renderer for the cloud static site.
-// Usage: CardUI.renderGrid(data, { showShips, showSrc, selectable, selected, onToggle })
+// Usage: CardUI.renderGrid(data, { showShips, showSrc, source, selectable, selected, onToggle })
 //   -> { totalOffers }
 // selected is a Set of group names; onToggle(group, checked) fires on a tick box.
+// source is "all" (default), "cardtrader" or "cardmarket" — see the filter below.
 // Expects #grid and #watching elements in the page.
 (function (global) {
   const COND_MAP = { MINT: "MT", "NEAR MINT": "NM", EXCELLENT: "EX", GOOD: "GD", "LIGHT PLAYED": "LP", "LIGHTLY PLAYED": "LP", PLAYED: "PL", "SLIGHTLY PLAYED": "SP", POOR: "PO" };
   // Offers from every site are merged into one price-sorted table per card, so each
   // row has to say where it came from.
   const SRC = { cardtrader: "CT", cardmarket: "CM" };
+  const SRC_NAME = { cardtrader: "CardTrader", cardmarket: "Cardmarket" };
   const condAbbr = (c) => (c ? COND_MAP[c.toUpperCase()] || c : "");
   const priceClass = (p) => (p == null ? "" : p < 5 ? "p-green" : p < 10 ? "p-yellow" : p < 15 ? "p-orange" : "p-red");
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -86,6 +88,13 @@
       groups[g].push(p);
     }
 
+    // Source filter. Applied to offers, not to cards: the tick box and the freshness
+    // chip describe *scraping* Cardmarket, which is unrelated to which prices you are
+    // looking at, so a card keeps both while showing only CardTrader rows. A card left
+    // with nothing to show falls through to the "watching" chips, as an out-of-stock
+    // card already does.
+    const only = opts.source && opts.source !== "all" ? opts.source : null;
+
     let totalOffers = 0;
     const empty = []; const errored = new Set(); const cards = [];
     for (const g of order) {
@@ -99,6 +108,7 @@
 
       let merged = [];
       for (const p of groups[g]) {
+        if (only && p.site !== only) continue;
         if (p.error) errored.add(g);
         const fallback = p.allVersions && solePrinting ? solePrinting : p;
         // An offer may carry its own set: Cardmarket's all-versions page returns one
@@ -162,7 +172,10 @@
     }
 
     if (empty.length) {
-      watching.innerHTML = `<div class="label">Watching · no offers yet (${empty.length})</div>
+      // Under a filter these cards usually do have offers — just not from the source
+      // you asked for. Saying "no offers yet" there would read as a fault.
+      const why = only ? `no ${SRC_NAME[only]} offers` : "no offers yet";
+      watching.innerHTML = `<div class="label">Watching · ${why} (${empty.length})</div>
         <div class="chips">${empty.map((g) => `<span class="chip${errored.has(g) ? " err" : ""}">${esc(g)}</span>`).join("")}</div>`;
     }
     return { totalOffers };
