@@ -295,6 +295,27 @@ function check(ok, msg) {
   check((await srcCount()) > 0, "Both brings the Src column back");
   await page.close();
 
+  console.log("the strip is pinned on a desktop and scrolls away on a phone");
+  // A short viewport is the point: the fixture grid is not tall enough to scroll at 900px.
+  for (const [label, vp, pinned] of [
+    ["desktop", { width: 1440, height: 500 }, true],
+    ["phone", { width: 390, height: 500 }, false],
+  ]) {
+    page = await browser.newPage({ viewport: vp });
+    await page.goto(`http://localhost:${port}/`);
+    await page.waitForSelector("#grid .card");
+    await page.evaluate(() => window.scrollTo(0, 600));
+    await page.waitForTimeout(150);
+    const box = await page.locator(".controls").boundingBox();
+    const onScreen = !!box && box.y >= 0 && box.y + box.height <= vp.height;
+    check(onScreen === pinned, `${label}: strip ${pinned ? "stays put" : "scrolls off"} — y=${box && Math.round(box.y)}`);
+    check(
+      (await page.locator("header").boundingBox()).y >= 0,
+      `${label}: the header is pinned either way`,
+    );
+    await page.close();
+  }
+
   console.log("the balance check runs the workflow without scraping");
   page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
   check((await page.locator("#cm-balance").count()) === 1, "the legend offers a free balance check");
