@@ -25,6 +25,15 @@
 const ROW_PRODUCT_LINK =
   /href=["'](?:https?:\/\/(?:www\.)?cardmarket\.com)?(\/[a-z]{2}\/Magic\/Products\/Singles\/([^/"']+)\/[^"'?#]+)(?=["'?#])/i;
 
+// What the live all-versions page actually serves. A captured row (test/fixtures/
+// cardmarket-row.html) contains no Products/Singles link at all — the only thing naming
+// the printing is the expansion symbol, which is an anchor to /Magic/Expansions/<Set>
+// wrapped around the icon. That href is the set in slug form, so it beats reading the
+// tooltip: it is markup rather than display text, so it needs no brand stripping
+// heuristics and cannot be localised out from under us.
+const ROW_EXPANSION_LINK =
+  /href=["'](?:https?:\/\/(?:www\.)?cardmarket\.com)?\/[a-z]{2}\/Magic\/Expansions\/([^/"'?#]+)(?=["'?#])/i;
+
 // Fallback: the expansion rendered as a symbol rather than a link. Only tags that
 // actually mention "expansion" are considered, so a "Foil" or seller tooltip can't be
 // mistaken for a set name.
@@ -95,9 +104,12 @@ function parseCardmarket(html) {
     if (/Login\?redirectTo/i.test(block)) shipsToMe = null; // logged out → unknown
     else if (/btn-grey|does not ship to your country/i.test(block)) shipsToMe = false;
     else shipsToMe = true;
-    // Which printing this row is for — only present on the all-versions page.
+    // Which printing this row is for — only present on the all-versions page. Three
+    // strategies, cheapest and most specific first: the product link (also gives a
+    // per-offer URL), the expansion link, then the icon's tooltip text.
     const prodMatch = block.match(ROW_PRODUCT_LINK);
-    const iconSet = prodMatch ? null : expansionFromIcon(block);
+    const expMatch = prodMatch ? null : block.match(ROW_EXPANSION_LINK);
+    const iconSet = prodMatch || expMatch ? null : expansionFromIcon(block);
     if (price !== null || sellerMatch) {
       offers.push({
         price,
@@ -110,7 +122,13 @@ function parseCardmarket(html) {
         language: null, // not reliably exposed by the guest HTML; the ?language= URL filters instead
         shipsToMe,
         // null on a single-product page; the caller then uses the config entry's set.
-        variant: prodMatch ? unslug(prodMatch[2]) : iconSet ? stripBrand(iconSet) : null,
+        variant: prodMatch
+          ? unslug(prodMatch[2])
+          : expMatch
+            ? unslug(expMatch[1])
+            : iconSet
+              ? stripBrand(iconSet)
+              : null,
         productUrl: prodMatch ? "https://www.cardmarket.com" + prodMatch[1] : null,
       });
     }

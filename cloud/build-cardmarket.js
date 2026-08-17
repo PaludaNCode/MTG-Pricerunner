@@ -24,6 +24,10 @@ const OUT = path.join(__dirname, "web", "cardmarket.json");
 
 const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY;
 
+// Upper bound on the debug sample row. Generous — it lands in a public JSON file, but one
+// row of marketplace HTML is small next to being able to test the parser offline at all.
+const MAX_SAMPLE_CHARS = 12000;
+
 // The parts of a previous result that are data rather than config: everything the
 // scrape produced, nothing the config owns.
 function pickData(r) {
@@ -32,6 +36,19 @@ function pickData(r) {
   if (r.failures) out.failures = r.failures;
   if (r.error) out.error = r.error;
   return out;
+}
+
+// Roll the ledger onto `today`. The day's counters reset at the UTC boundary, but
+// costPerScrape must not: it is a property of the plan and the proxy, not of the date.
+// Dropping it sent the next run back to the pessimistic 5-credit assumption, so it rated
+// itself at a fifth of what it could actually afford — the first refresh of each day
+// would silently defer most of the list. `fetchAll` already carries the learned cost
+// across days; this is the balance-only path, which has to agree with it.
+function carryMeta(prevMeta, today) {
+  if (prevMeta && prevMeta.day === today) return { ...prevMeta, day: today };
+  const fresh = { day: today, scrapes: 0, credits: 0 };
+  if (prevMeta && prevMeta.costPerScrape) fresh.costPerScrape = prevMeta.costPerScrape;
+  return fresh;
 }
 
 // The file must always describe EVERY watched card, not just this run's selection.
@@ -77,7 +94,7 @@ function readPrev() {
   }
 }
 
-(async () => {
+async function main() {
   const products = normalizeCards(CONFIG).filter((p) => p.site === "cardmarket");
   if (!products.length) {
     console.log("no cardmarket entries in config.json — nothing to do");
@@ -100,8 +117,9 @@ function readPrev() {
 
   // CM_DEBUG publishes one article row's raw HTML into meta.debug. Cardmarket cannot be
   // fetched from a dev box (Cloudflare), so this is the only way to check the parser's
-  // regexes against markup that actually exists — currently the per-row set link, which
-  // matches nothing on the live all-versions page.
+  // regexes against markup that actually exists. It is how we learned that the live
+  // all-versions row carries no product link at all; the captured specimen now lives in
+  // test/fixtures/cardmarket-row.html.
   const debugSample = /^(true|1|yes)$/i.test(process.env.CM_DEBUG || "");
   let sample = null;
 
@@ -117,8 +135,7 @@ function readPrev() {
   if (/^(true|1|yes)$/i.test(process.env.CM_BALANCE_ONLY || "")) {
     const now = Date.now();
     const today = cardmarket.utcDay(now);
-    const base = prev.meta && prev.meta.day === today ? prev.meta : { day: today, scrapes: 0, credits: 0 };
-    const meta = { ...base, day: today };
+    const meta = carryMeta(prev.meta, today);
     const credits = await cardmarket.getCredits(FIRECRAWL_KEY);
     if (credits) {
       const allowance = cardmarket.dailyCreditAllowance(credits, {
@@ -168,9 +185,18 @@ function readPrev() {
       // Stash the first all-versions row seen. Whether it gets published is decided
       // after parsing: if no offer came back with a printing, the extraction is wrong
       // and this row is the only way to find out how the page actually names it.
+      // Cut at the next row rather than after a fixed span: the first capture used a
+      // 3000-char window and stopped mid-tag, before the price and condition markup, so
+      // the specimen could only ever prove half the parser. A whole row costs nothing
+      // extra — the page is already paid for.
       if (!sample && p.allVersions) {
         const i = html.indexOf('id="articleRow');
-        if (i !== -1) sample = { url: p.productUrl, group: p.group, row: html.slice(Math.max(0, i - 400), i + 2600) };
+        if (i !== -1) {
+          const start = Math.max(0, i - 400);
+          const next = html.indexOf('id="articleRow', i + 1);
+          const end = Math.min(next === -1 ? html.length : next, start + MAX_SAMPLE_CHARS);
+          sample = { url: p.productUrl, group: p.group, row: html.slice(start, end) };
+        }
       }
     },
   });
@@ -205,4 +231,10 @@ function readPrev() {
   if (kept > 0) console.log(`carried ${kept} untouched card(s) forward from the previous snapshot`);
 
   write(publishSample ? { ...out.meta, debug: sample } : out.meta, results);
-})();
+}
+
+// Guarded so the unit tests can require this file for its helpers without launching a
+// run that would read config.json and reach for the network.
+if (require.main === module) main();
+
+module.exports = { carryMeta, mergeResults, pickData };
