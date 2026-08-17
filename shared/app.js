@@ -24,37 +24,52 @@
         if (Date.parse(cmFresh.updatedAt) > rawAt) cm = cmFresh;
         else cmFresh = null;
       }
-
-      const data = {
-        updatedAt: ct && ct.updatedAt,
-        results: [...((ct && ct.results) || []), ...((cm && cm.results) || [])],
-      };
-      const { totalOffers } = CardUI.renderGrid(data, {
-        showShips: true,
-        showSrc: cfg.showSrc !== false,
-        selectable: !!cfg.dispatch,
-        selected: picks,
-        pending,
-        cardmarketCards: (ct && ct.meta && ct.meta.cardmarketCards) || null,
-        onToggle,
-      });
-
-      // Set before renderLegend: it reports how many cards "Select all" would cover,
-      // so assigning afterwards left the link missing until the next poll.
-      allCards = (ct && ct.meta && ct.meta.cardmarketCards) || [];
-      lastMeta = cm && cm.meta;
-      // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
-      window.__cmUpdatedAt = cm && cm.updatedAt;
-
-      $("updated").textContent =
-        (data.updatedAt ? "updated " + new Date(data.updatedAt).toLocaleString() : "starting…") +
-        " · " + totalOffers + " offers" +
-        cmSummary(cm);
-      renderLegend(cm);
-      syncButton();
+      lastCt = ct;
+      lastCm = cm;
+      paint();
     } catch (e) {
       $("updated").textContent = "load failed: " + e;
     }
+  }
+
+  // Everything that turns the two cached feeds into pixels, split out of refresh() so
+  // the source filter and the selection buttons can repaint instantly — both are pure
+  // client-side state, and refetching both files to apply them would be a round trip
+  // for nothing (and would make the ticks flicker on a slow connection).
+  function paint() {
+    const ct = lastCt;
+    const cm = lastCm;
+    const data = {
+      updatedAt: ct && ct.updatedAt,
+      results: [...((ct && ct.results) || []), ...((cm && cm.results) || [])],
+    };
+    const { totalOffers } = CardUI.renderGrid(data, {
+      showShips: true,
+      // With one source on screen every row's Src cell would say the same thing, so the
+      // column goes and its width is handed to Set (see body.one-source in ui.css).
+      showSrc: cfg.showSrc !== false && source === "all",
+      source,
+      selectable: !!cfg.dispatch,
+      selected: picks,
+      pending,
+      cardmarketCards: (ct && ct.meta && ct.meta.cardmarketCards) || null,
+      onToggle,
+    });
+
+    // Set before renderLegend and syncPicks: both report how many cards the selection
+    // covers, so assigning afterwards left them a poll behind.
+    allCards = (ct && ct.meta && ct.meta.cardmarketCards) || [];
+    lastMeta = cm && cm.meta;
+    // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
+    window.__cmUpdatedAt = cm && cm.updatedAt;
+
+    $("updated").textContent =
+      (data.updatedAt ? "updated " + new Date(data.updatedAt).toLocaleString() : "starting…") +
+      " · " + totalOffers + " offers" +
+      cmSummary(cm);
+    renderLegend(cm);
+    syncButton();
+    syncPicks();
   }
 
   // What the header says about Cardmarket. Deliberately NOT the age of cardmarket.json:
@@ -86,15 +101,6 @@
       (affordable != null
         ? `, and today's budget still covers about <b>${affordable} card${affordable === 1 ? "" : "s"}</b>.`
         : ". CardTrader keeps updating on its own, for free.") +
-      // Ticking two dozen boxes by hand is the obvious thing to want to skip. The cost
-      // is shown up front because selecting everything is the most expensive press
-      // available, and the button gives no second chance to reconsider.
-      (cfg.dispatch && allCards.length
-        ? ` <a href="#" id="cm-all">${picks.size >= allCards.length ? "Clear selection" : `Select all ${allCards.length}`}</a>` +
-          (picks.size >= allCards.length
-            ? ""
-            : ` <span class="muted">(~${Math.round(allCards.length * (cost || 1))} credits)</span>`)
-        : "") +
       // Reading the balance is not billed, so this is genuinely free — worth offering,
       // since otherwise the only way to refresh that figure is to spend credits.
       (cfg.dispatch && getToken()
@@ -113,6 +119,13 @@
   const PICKS_KEY = "mtg-pricerunner.cm-picks";
   const picks = new Set(loadPicks());
 
+  // Which feed the grid shows. Remembered across visits like the picks are: the strip
+  // always states the active mode, so a filter left on CM can't turn into a mystery
+  // about where the CardTrader prices went.
+  const SOURCE_KEY = "mtg-pricerunner.source";
+  const SOURCES = ["all", "cardtrader", "cardmarket"];
+  let source = SOURCES.includes(localStorage.getItem(SOURCE_KEY)) ? localStorage.getItem(SOURCE_KEY) : "all";
+
   function loadPicks() {
     try {
       const raw = JSON.parse(localStorage.getItem(PICKS_KEY) || "[]");
@@ -121,18 +134,29 @@
       return [];
     }
   }
+  function savePicks() {
+    localStorage.setItem(PICKS_KEY, JSON.stringify([...picks]));
+  }
   function onToggle(group, checked) {
     if (checked) picks.add(group);
     else picks.delete(group);
-    localStorage.setItem(PICKS_KEY, JSON.stringify([...picks]));
+    savePicks();
     syncButton();
+    syncPicks();
   }
 
   const btn = $("cm-refresh");
   const tokenInput = $("cm-token");
   const tokenToggle = $("cm-token-toggle");
+  const srcFilter = $("src-filter");
+  const allBtn = $("cm-all");
+  const noneBtn = $("cm-none");
+  const pickCount = $("pick-count");
   let polling = false;
   let lastMeta = null;
+  // The two feeds as last fetched, so paint() can redraw without hitting the network.
+  let lastCt = null;
+  let lastCm = null;
   // Cards the in-flight run is scraping, so they can show a spinner rather than a
   // stale age while the workflow is running.
   let pending = new Set();
@@ -203,6 +227,56 @@
       spent: left < (meta.costPerScrape || 1),
       note: `${used} of ${Math.round(meta.allowance)} credits used today`,
     };
+  }
+
+  // ---- Control strip ----------------------------------------------------------------
+  // Source filter (free, client-side) and the selection buttons that used to be a link
+  // inside the legend sentence, where they read as prose rather than as controls.
+
+  function syncSource() {
+    if (srcFilter) {
+      for (const b of srcFilter.querySelectorAll("button[data-src]")) {
+        b.setAttribute("aria-pressed", String(b.dataset.src === source));
+      }
+    }
+    document.body.classList.toggle("one-source", source !== "all");
+  }
+
+  function setSource(next) {
+    if (!SOURCES.includes(next) || next === source) return;
+    source = next;
+    localStorage.setItem(SOURCE_KEY, source);
+    syncSource();
+    if (lastCt || lastCm) paint(); // a click before the first fetch has nothing to draw
+  }
+
+  // What the selection costs, stated next to the buttons that change it. The estimate
+  // matters more than the count: pressing ↻ CM with everything ticked is the most
+  // expensive thing this page can do, and it asks for no confirmation.
+  function syncPicks() {
+    const n = picks.size;
+    const total = allCards.length;
+    if (pickCount) {
+      const cost = lastMeta && lastMeta.costPerScrape;
+      // .ctl-more is dropped on phones (ui.css): the words are worth their width on a
+      // desktop, but keeping them costs the strip a whole third row on a small screen.
+      pickCount.innerHTML = !total
+        ? ""
+        : n
+          ? `<b>${n}</b> of ${total}<span class="ctl-more"> selected</span>` +
+            (cost ? ` · ~${Math.round(n * cost)} credits` : "")
+          : '<span class="ctl-more">none ticked · </span>stalest first';
+    }
+    if (allBtn) allBtn.disabled = !total || n >= total;
+    if (noneBtn) noneBtn.disabled = !n;
+  }
+
+  function setPicks(names) {
+    picks.clear();
+    for (const g of names) picks.add(g);
+    savePicks();
+    if (lastCt || lastCm) paint(); // repaints the tick boxes, the count and the button
+    else syncPicks();
   }
 
   // Single place that decides what the button says: mid-run > no token > no budget > ready.
@@ -442,26 +516,27 @@
     }
   }
 
+  // The filter works with or without a token: looking at one source costs nothing.
+  if (srcFilter) {
+    srcFilter.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-src]");
+      if (b) setSource(b.dataset.src);
+    });
+  }
+  syncSource();
+
   if (btn && cfg.dispatch) {
     btn.addEventListener("click", () => onRefresh("scrape"));
+    if (allBtn) allBtn.addEventListener("click", () => setPicks(allCards));
+    if (noneBtn) noneBtn.addEventListener("click", () => setPicks([]));
     // Delegated: renderLegend rewrites that element on every poll, so a handler bound
     // to the link itself would be thrown away a minute later.
     const legendEl = $("legend");
     if (legendEl) {
       legendEl.addEventListener("click", (e) => {
-        if (!e.target) return;
-        if (e.target.id === "cm-balance") {
+        if (e.target && e.target.id === "cm-balance") {
           e.preventDefault();
           onRefresh("balance");
-        }
-        if (e.target.id === "cm-all") {
-          e.preventDefault();
-          // Toggle: all selected -> clear, otherwise select everything configured.
-          const selectAll = picks.size < allCards.length;
-          picks.clear();
-          if (selectAll) allCards.forEach((g) => picks.add(g));
-          localStorage.setItem(PICKS_KEY, JSON.stringify([...picks]));
-          refresh(); // repaint the tick boxes, the button count and this link
         }
       });
     }
@@ -479,10 +554,12 @@
       if (!getToken()) tokenInput.hidden = false;
     }
     syncButton();
-  } else if (btn) {
-    btn.hidden = true;
-    if (tokenInput) tokenInput.hidden = true;
-    if (tokenToggle) tokenToggle.hidden = true;
+    syncPicks();
+  } else {
+    // No dispatch target configured: nothing here can spend credits, so the whole
+    // right-hand half of the strip goes. The source filter stays — it is free.
+    const group = $("cm-group");
+    if (group) group.hidden = true;
   }
 
   refresh();

@@ -1,0 +1,516 @@
+<title>Selection &amp; Source Controls</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * Review page chrome. Single dark theme on purpose: every specimen on
+   * this page is an in-situ mock of a dark dashboard, so a light ground
+   * would misreport what the change actually looks like.
+   * ------------------------------------------------------------------ */
+  :root {
+    --ground: #0b0d12;
+    --panel: #12151d;
+    --panel2: #171b25;
+    --line: #262b38;
+    --txt: #e9ecf2;
+    --muted: #8b91a3;
+    --violet: #8b7cff;
+    --teal: #36d6c3;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: system-ui, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--txt); font-family: var(--sans);
+         font-size: 16px; line-height: 1.6; padding: 0 1.25rem 5rem; }
+  .page { max-width: 68rem; margin: 0 auto; display: flex; flex-direction: column; gap: 3.25rem; }
+
+  .page-head { padding-top: 3.5rem; display: flex; flex-direction: column; gap: .9rem;
+               border-bottom: 1px solid var(--line); padding-bottom: 2rem; }
+  .eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+             color: var(--muted); margin: 0; }
+  h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 4.5vw, 2.9rem);
+       line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  .lede { margin: 0; max-width: 46rem; color: #c3c8d4; }
+  .lede b { color: var(--txt); font-weight: 600; }
+
+  .widthbar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .4rem; }
+  .widthbar .cap { font-family: var(--mono); font-size: .7rem; letter-spacing: .12em;
+                   text-transform: uppercase; color: var(--muted); }
+
+  /* Segmented control, used by the page itself and (restyled) inside mock A. */
+  .seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .seg button { font: inherit; font-size: .78rem; font-weight: 600; color: var(--muted); background: none;
+                border: 0; border-radius: 999px; padding: .25rem .8rem; cursor: pointer; white-space: nowrap; }
+  .seg button:hover { color: var(--txt); }
+  .seg button[aria-pressed="true"] { background: rgba(139,124,255,.22); color: var(--txt);
+                                     box-shadow: inset 0 0 0 1px rgba(139,124,255,.45); }
+  .seg button:focus-visible, .btn:focus-visible, .refresh:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* One option = one specimen block. */
+  .spec { display: flex; flex-direction: column; gap: 1.1rem; }
+  .spec-head { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }
+  .tag { font-family: var(--mono); font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+         color: var(--ground); background: var(--violet); border-radius: 5px; padding: .1rem .45rem; }
+  h2 { font-family: var(--serif); font-weight: 400; font-size: 1.65rem; margin: 0; letter-spacing: -.01em; }
+  .thesis { margin: -.4rem 0 0; color: #c3c8d4; max-width: 52rem; }
+  .page code { font-family: var(--mono); font-size: .88em; color: var(--teal); }
+
+  .frame { background: #05070b; border: 1px solid var(--line); border-radius: 16px; padding: 1rem;
+           box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+
+  .notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+           background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .notes > div { background: var(--panel); padding: .85rem 1rem 1rem; }
+  .notes dt { font-family: var(--mono); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+              color: var(--muted); margin: 0 0 .35rem; }
+  .notes dd { margin: 0; font-size: .88rem; line-height: 1.55; color: #c8ccd8; }
+  .notes dd b { color: var(--txt); font-weight: 600; }
+
+  .verdict { border-top: 1px solid var(--line); padding-top: 2.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  .cmp-wrap { overflow-x: auto; }
+  table.cmp { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: .88rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: .6rem .8rem; border-top: 1px solid var(--line); vertical-align: top; }
+  table.cmp thead th { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+                       color: var(--muted); border-top: 0; font-weight: 600; }
+  table.cmp tbody th { font-weight: 600; color: var(--txt); white-space: nowrap; }
+  table.cmp td { color: #c8ccd8; }
+  .verdict p { margin: 0; max-width: 52rem; color: #c3c8d4; }
+  .verdict b { color: var(--txt); }
+
+  /* ------------------------------------------------------------------ *
+   * Mock chrome. These rules are lifted from shared/ui.css so the
+   * specimens render as the real page does — scoped under .mock so they
+   * can't leak into the review page around them.
+   * ------------------------------------------------------------------ */
+  .mock { --bg: #0e1016; --card: #171a23; --card2: #1e222e; --mline: #2a2f3d;
+          --mtxt: #e7e9ee; --mmuted: #8b91a3; --accent: #8b7cff; --accent2: #36d6c3;
+          font-family: var(--sans); background: var(--bg); color: var(--mtxt);
+          border: 1px solid var(--mline); border-radius: 12px; overflow: hidden; }
+  .mock.is-phone { max-width: 390px; margin: 0 auto; }
+
+  .app-head { padding: .7rem 1rem; background: linear-gradient(120deg, #1b1740, #15233a 60%, #122b2b);
+              border-bottom: 1px solid var(--mline); display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+  .app-head .h { font-size: 1.05rem; font-weight: 600; margin: 0; }
+  .app-head .sub { font-weight: 400; color: var(--mmuted); font-size: .78rem; margin-left: .4rem; }
+  .live { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--accent2); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none } }
+  .grow { flex: 1; }
+  .mock .meta { color: var(--mmuted); font-size: .76rem; }
+
+  .refresh { font: inherit; font-size: .75rem; font-weight: 600; color: var(--accent2);
+             background: rgba(54,214,195,.1); border: 1px solid rgba(54,214,195,.35); border-radius: 999px;
+             padding: .2rem .6rem; cursor: pointer; white-space: nowrap; }
+  .refresh:hover:not(:disabled) { background: rgba(54,214,195,.2); }
+  .refresh:disabled { color: var(--mmuted); background: transparent; border-color: var(--mline); cursor: default; }
+  .refresh.key { padding: .2rem .45rem; }
+
+  /* New controls under review. */
+  .btn { font: inherit; font-size: .75rem; font-weight: 600; color: var(--mmuted); background: rgba(255,255,255,.03);
+         border: 1px solid var(--mline); border-radius: 999px; padding: .2rem .65rem; cursor: pointer; white-space: nowrap; }
+  .btn:hover:not(:disabled) { color: var(--mtxt); border-color: #3a4252; }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  .toolbar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+             padding: .5rem 1rem; background: rgba(0,0,0,.22); border-bottom: 1px solid var(--mline); }
+  .tb-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mmuted); }
+  .tb-count { font-size: .75rem; color: var(--mmuted); font-variant-numeric: tabular-nums; }
+  .tb-count b { color: var(--mtxt); font-weight: 600; }
+  .tb-sep { width: 1px; align-self: stretch; background: var(--mline); margin: 0 .2rem; }
+
+  .pills { display: inline-flex; align-items: center; gap: .3rem; }
+  .pill { font: inherit; font-size: .72rem; font-weight: 600; color: var(--mmuted); background: rgba(0,0,0,.25);
+          border: 1px solid var(--mline); border-radius: 999px; padding: .15rem .55rem; cursor: pointer; white-space: nowrap; }
+  .pill:hover { color: var(--mtxt); }
+  .pill[aria-pressed="true"] { color: var(--mtxt); background: rgba(139,124,255,.2); border-color: rgba(139,124,255,.5); }
+  .pill:disabled { opacity: .4; cursor: default; }
+  .pill-label { font-family: var(--mono); font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mmuted); }
+  .pill:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+  .srcsel { font: inherit; font-size: .75rem; color: var(--mtxt); background: rgba(0,0,0,.3);
+            border: 1px solid var(--mline); border-radius: 999px; padding: .2rem .5rem; cursor: pointer; }
+  .srcsel:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .sel-wrap { display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; color: var(--mmuted); }
+
+  .selbar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .55rem 1rem;
+            background: rgba(139,124,255,.09); border-bottom: 1px solid rgba(139,124,255,.28); }
+  .selbar .txt { font-size: .78rem; color: var(--mmuted); font-variant-numeric: tabular-nums; }
+  .selbar .txt b { color: var(--mtxt); font-weight: 600; }
+  .selbar .actions { display: inline-flex; align-items: center; gap: .35rem; margin-left: auto; }
+
+  .legend { color: var(--mmuted); font-size: .76rem; line-height: 1.5; padding: .7rem 1rem 0; }
+  .legend .label { color: var(--mtxt); font-weight: 600; }
+  .legend b { color: var(--mtxt); font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; padding: .9rem 1rem 1rem; }
+  .mock.is-phone .grid { grid-template-columns: minmax(0, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--mline); border-radius: 14px; overflow: hidden; }
+  .card .ttl { font-size: 1.02rem; font-weight: 600; margin: 0; padding: .6rem .8rem; display: flex;
+               justify-content: space-between; align-items: center; gap: .5rem;
+               background: linear-gradient(90deg, rgba(139,124,255,.18), transparent); border-bottom: 1px solid var(--mline); }
+  .card .ttl > span.nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: .78rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px; background: var(--accent); color: #0b0b12; }
+  .badges { display: inline-flex; gap: .35rem; align-items: center; }
+  .pick { flex: 0 0 auto; width: 1rem; height: 1rem; margin: 0 .1rem 0 0; accent-color: var(--accent); color-scheme: dark; cursor: pointer; }
+  .age { font-size: .66rem; font-weight: 600; letter-spacing: .3px; padding: .12rem .42rem; border-radius: 999px;
+         background: var(--card2); color: var(--mmuted); border: 1px solid var(--mline); font-variant-numeric: tabular-nums; }
+  .age.new { color: var(--accent2); border-color: rgba(54,214,195,.35); }
+
+  .mock table { width: 100%; border-collapse: collapse; font-size: .86rem; table-layout: fixed; }
+  .mock col.c-price { width: 22%; } .mock col.c-cond { width: 12%; } .mock col.c-qty { width: 9%; }
+  .mock col.c-ship { width: 9%; } .mock col.c-src { width: 10%; } .mock col.c-set { width: 38%; }
+  .mock th, .mock td { text-align: left; padding: .4rem .5rem; border-top: 1px solid #232734;
+                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mock th { color: var(--mmuted); font-weight: 600; font-size: .66rem; text-transform: uppercase;
+             letter-spacing: .3px; padding-right: .25rem; }
+  .mock td a { color: var(--accent2); text-decoration: none; }
+  .mock th.c-src, .mock td.c-src { padding-left: .3rem; padding-right: .3rem; }
+  .foil { color: #f5c542; font-weight: 700; font-size: .68rem; }
+  .yes { color: #2ecc40; } .no { color: #ff5b52; } .unk { color: var(--mmuted); }
+  tr.p-green  td:first-child { box-shadow: inset 3px 0 0 #2ecc40; }
+  tr.p-yellow td:first-child { box-shadow: inset 3px 0 0 #f5c542; }
+  tr.p-orange td:first-child { box-shadow: inset 3px 0 0 #ff851b; }
+  tr.p-red    td:first-child { box-shadow: inset 3px 0 0 #ff4136; }
+  .set-code { display: none; }
+  .mock.is-phone .set-full { display: none; }
+  .mock.is-phone .set-code { display: inline; }
+  .mock.is-phone .app-head { padding: .55rem .7rem; gap: .45rem .6rem; }
+  .mock.is-phone .toolbar, .mock.is-phone .selbar { padding: .5rem .7rem; }
+  .mock.is-phone .selbar .actions { margin-left: 0; }
+  .mock.is-phone .grid { padding: .7rem; gap: .7rem; }
+  .mock.is-phone .legend { padding: .6rem .7rem 0; }
+  /* Phone column widths and paddings mirror the 480px block of shared/ui.css. */
+  .mock.is-phone table { font-size: .8rem; }
+  .mock.is-phone th, .mock.is-phone td { padding: .35rem .3rem .35rem .45rem; }
+  .mock.is-phone th { font-size: .6rem; letter-spacing: .2px; }
+  .mock.is-phone col.c-price { width: 26%; } .mock.is-phone col.c-cond { width: 12%; }
+  .mock.is-phone col.c-qty { width: 9%; } .mock.is-phone col.c-ship { width: 9%; }
+  .mock.is-phone col.c-src { width: 10%; } .mock.is-phone col.c-set { width: 34%; }
+  .mock.is-phone th.c-src, .mock.is-phone td.c-src { padding-left: .2rem; padding-right: .2rem; font-size: .72rem; }
+
+  .empty { padding: .9rem 1rem 1.4rem; color: var(--mmuted); font-size: .8rem; }
+
+  @media (max-width: 720px) {
+    .notes { grid-template-columns: minmax(0, 1fr); }
+    .frame { padding: .6rem; }
+  }
+</style>
+
+<main class="page">
+  <header class="page-head">
+    <p class="eyebrow">JP Card Watcher · UI proposal</p>
+    <h1>Three ways to hold selection and source</h1>
+    <p class="lede">
+      Two controls need a home. <b>Select all / none</b> is currently a link buried in the legend
+      sentence, where it reads as prose rather than a button. And there is no way to see
+      <b>only Cardmarket</b> or <b>only CardTrader</b> rows — both feeds are merged into every table.
+      Each option below is live: click the source filter, tick cards, watch the ↻ CM count follow.
+      Nothing in the real site has changed yet.
+    </p>
+    <div class="widthbar">
+      <span class="cap">Preview at</span>
+      <div class="seg" role="group" aria-label="Preview width">
+        <button type="button" data-width="desktop" aria-pressed="true">Desktop</button>
+        <button type="button" data-width="phone" aria-pressed="false">Phone · 390px</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">A</span>
+      <h2>Control strip</h2>
+    </div>
+    <p class="thesis">
+      A dedicated bar under the header holds everything that decides what a refresh costs:
+      source on the left, selection and ↻ CM on the right. The header goes back to being
+      identity and status only.
+    </p>
+    <div class="frame"><div class="mock" data-variant="a"></div></div>
+    <dl class="notes">
+      <div><dt>Where it lives</dt><dd>New full-width row between header and grid. Segmented <b>Both / CT / CM</b>, then <b>Select all</b> · <b>Clear</b>, then ⚿ and ↻ CM.</dd></div>
+      <div><dt>Good for</dt><dd>The controls sit next to the button they affect, and the live <b>“n of 3 selected”</b> readout sits between them, so cost is legible before you press.</dd></div>
+      <div><dt>Costs</dt><dd>~34px of vertical space above the grid, on every screen. On a phone the strip wraps to two lines.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">B</span>
+      <h2>Header pills</h2>
+    </div>
+    <p class="thesis">
+      No new furniture. Both controls become pills in the existing header, styled like the
+      ↻ CM button already there — the cheapest change in both code and screen space.
+    </p>
+    <div class="frame"><div class="mock" data-variant="b"></div></div>
+    <dl class="notes">
+      <div><dt>Where it lives</dt><dd>Inside the sticky header. <b>Show: Both / CT / CM</b>, then <b>☑ All</b> · <b>☐ None</b> beside ⚿ and ↻ CM.</dd></div>
+      <div><dt>Good for</dt><dd>Zero vertical cost, and the header is sticky — the filter stays reachable while you scroll a long grid. Smallest diff to ship.</dd></div>
+      <div><dt>Costs</dt><dd>Seven controls in one header. Below roughly 1100px it wraps to two or three rows, and a sticky header that tall eats real estate on every scroll; the selected count survives only in the ↻ CM label.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">C</span>
+      <h2>Spend bar</h2>
+    </div>
+    <p class="thesis">
+      Split the two by consequence. Source filtering is free, so it shrinks to a dropdown in
+      the header. Selection spends credits, so it gets a tinted band that states the bill —
+      <code>2 of 3 cards · ~2 credits</code> — right beside the button that pays it.
+    </p>
+    <div class="frame"><div class="mock" data-variant="c"></div></div>
+    <dl class="notes">
+      <div><dt>Where it lives</dt><dd>Dropdown in the header; violet band above the grid with <b>All</b> · <b>None</b> · <b>Invert</b> and ↻ CM.</dd></div>
+      <div><dt>Good for</dt><dd>The one irreversible action on the page reads as its own zone, with the credit estimate attached. <b>Invert</b> makes “everything except these two” a single click.</dd></div>
+      <div><dt>Costs</dt><dd>Most new CSS, and a band that is always on screen even when nothing is selected. A dropdown takes two taps where a segment takes one.</dd></div>
+    </dl>
+  </section>
+
+  <section class="verdict">
+    <h2>Picking between them</h2>
+    <div class="cmp-wrap">
+      <table class="cmp">
+        <thead>
+          <tr><th>&nbsp;</th><th>A · Control strip</th><th>B · Header pills</th><th>C · Spend bar</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Vertical cost</th><td>One row, always</td><td>None on wide screens; a taller sticky header below ~1100px</td><td>One row, always</td></tr>
+          <tr><th>Source filter</th><td>Segmented, one tap</td><td>Pills, one tap</td><td>Dropdown, two taps</td></tr>
+          <tr><th>Selection visible</th><td>Count in the strip</td><td>Only in the ↻ CM label</td><td>Count and credit estimate</td></tr>
+          <tr><th>Sticky while scrolling</th><td>No — scrolls away with the grid</td><td>Yes — rides the sticky header</td><td>No</td></tr>
+          <tr><th>Work to build</th><td>Medium</td><td>Small</td><td>Medium-large</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <b>My pick is A.</b> Selection and source both change what the ↻ CM button will do, so they belong
+      in one place next to it, and the strip has room for the “n of 3 selected” readout that the header
+      cannot fit. If header space on phones is the priority, B is the cheaper answer; C is worth it only
+      if you want the credit estimate on screen permanently.
+    </p>
+    <p>
+      Whichever you pick, the same three things land in the real code: source state and picks stay in
+      <code>localStorage</code> alongside the existing <code>cm-picks</code>, filtering happens in
+      <code>render.js</code> before offers are merged, and the legend keeps its prose but loses its link.
+    </p>
+  </section>
+</main>
+
+<script>
+  /* Sample feed: two sources merged per card, exactly as app.js concatenates them.
+     "Agadeem's Awakening" has no Cardmarket offers yet and "Seeker of Skybreak" has no
+     Cardmarket entry at all — both disappear under a CM-only filter, which is the
+     behaviour worth judging. */
+  var CARDS = [
+    { name: "Runehorn Hellkite", cm: true, chip: "3h", offers: [
+      { price: 3.99, str: "3.99 €", cond: "NM", qty: 2, src: "CM", set: "Commander 2016", code: "C16", foil: false, ship: null },
+      { price: 4.11, str: "4.11 €", cond: "NM", qty: 7, src: "CT", set: "Commander 2016", code: "C16", foil: false, ship: true },
+      { price: 6.50, str: "6.50 €", cond: "NM", qty: 1, src: "CT", set: "Starter Cmdr Decks", code: "SCD", foil: false, ship: true },
+      { price: 12.50, str: "12.50 €", cond: "EX", qty: 1, src: "CM", set: "Starter Cmdr Decks", code: "SCD", foil: true, ship: null } ] },
+    { name: "Stock Up", cm: true, chip: "5h", offers: [
+      { price: 2.80, str: "2.80 €", cond: "NM", qty: 12, src: "CT", set: "Foundations", code: "FDN", foil: false, ship: true },
+      { price: 3.15, str: "3.15 €", cond: "NM", qty: 4, src: "CM", set: "Foundations", code: "FDN", foil: false, ship: null },
+      { price: 9.90, str: "9.90 €", cond: "MT", qty: 2, src: "CT", set: "Foundations", code: "FDN", foil: true, ship: false } ] },
+    { name: "Agadeem's Awakening", cm: true, chip: "new", offers: [
+      { price: 18.40, str: "18.40 €", cond: "NM", qty: 1, src: "CT", set: "Zendikar Rising", code: "ZNR", foil: false, ship: true },
+      { price: 21.00, str: "21.00 €", cond: "EX", qty: 3, src: "CT", set: "Zendikar Rising", code: "ZNR", foil: false, ship: null } ] },
+    { name: "Seeker of Skybreak", cm: false, chip: null, offers: [
+      { price: 1.20, str: "1.20 €", cond: "NM", qty: 20, src: "CT", set: "Mystery Booster", code: "MB1", foil: false, ship: true },
+      { price: 1.75, str: "1.75 €", cond: "NM", qty: 5, src: "CT", set: "Mystery Booster", code: "MB1", foil: false, ship: true } ] }
+  ];
+  var REFRESHABLE = CARDS.filter(function (c) { return c.cm; }).map(function (c) { return c.name; });
+  var COST = 1; // credits per card, illustrative
+
+  var esc = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m];
+    });
+  };
+  var priceClass = function (p) { return p < 5 ? "p-green" : p < 10 ? "p-yellow" : p < 15 ? "p-orange" : "p-red"; };
+  var shipCell = function (v) {
+    return v === true ? '<span class="yes">✓</span>' : v === false ? '<span class="no">✗</span>' : '<span class="unk">?</span>';
+  };
+
+  var HEAD = '<h1 class="h">🃏 JP Card Watcher <span class="sub">CardTrader · Cardmarket · Japanese</span></h1>' +
+             '<span class="live"><span class="dot"></span>live</span>';
+  var STATUS = '<span class="meta">updated 12:04 · 41 offers · CM 10/33 credits</span>';
+  var KEYBTN = '<button class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>';
+  var CMBTN = '<button class="refresh" type="button" data-refresh>↻ CM</button>';
+
+  function segHtml(cls) {
+    return '<div class="' + cls + '" role="group" aria-label="Source filter">' +
+      '<button type="button" data-act="src" data-v="all">Both</button>' +
+      '<button type="button" data-act="src" data-v="ct">CT</button>' +
+      '<button type="button" data-act="src" data-v="cm">CM</button></div>';
+  }
+
+  /* Each variant differs only in this chrome — the grid, the state and the handlers
+     below are shared, so what you are comparing is the control layout and nothing else. */
+  var CHROME = {
+    a: '<div class="app-head">' + HEAD + '<span class="grow"></span>' + STATUS + '</div>' +
+       '<div class="toolbar">' +
+         '<span class="tb-label">Source</span>' + segHtml("seg") +
+         '<span class="grow"></span>' +
+         '<span class="tb-count" data-count></span>' +
+         '<button class="btn" type="button" data-act="all">Select all</button>' +
+         '<button class="btn" type="button" data-act="none">Clear</button>' +
+         '<span class="tb-sep"></span>' + KEYBTN + CMBTN +
+       '</div>' +
+       '<div class="legend"><span class="label">Cardmarket is scraped only when you ask.</span> ' +
+         'Nothing refreshes it on a timer — it costs credits, so it waits for you. The chip on each ' +
+         'card shows how long ago that card was last scraped, and today\'s budget still covers about ' +
+         '<b>23 cards</b>.</div>',
+
+    b: '<div class="app-head">' + HEAD + '<span class="grow"></span>' + STATUS +
+         '<span class="pills"><span class="pill-label">Show</span>' +
+           '<button class="pill" type="button" data-act="src" data-v="all">Both</button>' +
+           '<button class="pill" type="button" data-act="src" data-v="ct">CT</button>' +
+           '<button class="pill" type="button" data-act="src" data-v="cm">CM</button></span>' +
+         '<span class="pills">' +
+           '<button class="pill" type="button" data-act="all">☑ All</button>' +
+           '<button class="pill" type="button" data-act="none">☐ None</button>' +
+           KEYBTN + CMBTN + '</span>' +
+       '</div>' +
+       '<div class="legend"><span class="label">Cardmarket is scraped only when you ask.</span> ' +
+         'Nothing refreshes it on a timer — it costs credits, so it waits for you. ' +
+         '<span data-count></span></div>',
+
+    c: '<div class="app-head">' + HEAD + '<span class="grow"></span>' + STATUS +
+         '<label class="sel-wrap">Show ' +
+           '<select class="srcsel" data-act="srcsel">' +
+             '<option value="all">Both sources</option>' +
+             '<option value="ct">CardTrader only</option>' +
+             '<option value="cm">Cardmarket only</option>' +
+           '</select></label>' + KEYBTN +
+       '</div>' +
+       '<div class="selbar">' +
+         '<span class="txt" data-count></span>' +
+         '<span class="actions">' +
+           '<button class="btn" type="button" data-act="all">All</button>' +
+           '<button class="btn" type="button" data-act="none">None</button>' +
+           '<button class="btn" type="button" data-act="invert">Invert</button>' +
+           CMBTN + '</span>' +
+       '</div>' +
+       '<div class="legend"><span class="label">Cardmarket is scraped only when you ask.</span> ' +
+         'Nothing refreshes it on a timer — it costs credits, so it waits for you. The chip on each ' +
+         'card shows how long ago that card was last scraped.</div>'
+  };
+
+  function cardHtml(card, offers, picks) {
+    var rows = offers.map(function (o) {
+      return '<tr class="' + priceClass(o.price) + '">' +
+        '<td class="c-price">' + esc(o.str) + (o.foil ? ' <span class="foil">✦</span>' : "") + "</td>" +
+        '<td class="c-cond">' + esc(o.cond) + "</td>" +
+        '<td class="c-qty">' + o.qty + "</td>" +
+        '<td class="c-ship">' + shipCell(o.ship) + "</td>" +
+        '<td class="c-src">' + o.src + "</td>" +
+        '<td class="c-set"><a href="#" onclick="return false"><span class="set-full">' + esc(o.set) +
+          '</span><span class="set-code">' + esc(o.code) + "</span></a></td></tr>";
+    }).join("");
+    var pick = card.cm
+      ? '<input type="checkbox" class="pick" data-pick="' + esc(card.name) + '"' + (picks[card.name] ? " checked" : "") +
+        ' aria-label="Include ' + esc(card.name) + ' in the next Cardmarket refresh">'
+      : "";
+    var chip = card.chip
+      ? '<span class="age' + (card.chip === "new" ? " new" : "") + '">' + esc(card.chip) + "</span>"
+      : "";
+    return '<div class="card"><p class="ttl">' + pick + '<span class="nm">' + esc(card.name) + "</span>" +
+      '<span class="badges">' + chip + '<span class="badge">' + offers.length + "</span></span></p>" +
+      "<table><colgroup><col class=\"c-price\"><col class=\"c-cond\"><col class=\"c-qty\">" +
+      "<col class=\"c-ship\"><col class=\"c-src\"><col class=\"c-set\"></colgroup>" +
+      "<tr><th class=\"c-price\">Price</th><th class=\"c-cond\">Cond</th><th class=\"c-qty\">Qty</th>" +
+      "<th class=\"c-ship\">Ship</th><th class=\"c-src\">Src</th><th class=\"c-set\">Set</th></tr>" +
+      rows + "</table></div>";
+  }
+
+  function mount(root) {
+    var variant = root.dataset.variant;
+    var state = { src: "all", picks: { "Runehorn Hellkite": true } };
+    root.innerHTML = CHROME[variant] + '<div class="grid"></div>';
+
+    var grid = root.querySelector(".grid");
+    var counts = root.querySelectorAll("[data-count]");
+    var refreshBtn = root.querySelector("[data-refresh]");
+
+    function picked() { return REFRESHABLE.filter(function (n) { return state.picks[n]; }); }
+
+    function paint() {
+      var want = state.src;
+      var shown = 0;
+      grid.innerHTML = CARDS.map(function (card) {
+        var offers = card.offers.filter(function (o) {
+          return want === "all" || (want === "ct" ? o.src === "CT" : o.src === "CM");
+        }).sort(function (a, b) { return a.price - b.price; });
+        if (!offers.length) return "";
+        shown++;
+        return cardHtml(card, offers, state.picks);
+      }).join("");
+      if (!shown) grid.innerHTML = "";
+      var note = root.querySelector(".empty");
+      if (note) note.remove();
+      if (shown < CARDS.length) {
+        var hidden = CARDS.length - shown;
+        grid.insertAdjacentHTML("afterend",
+          '<p class="empty">' + hidden + (hidden === 1 ? " card has" : " cards have") +
+          " no " + (want === "ct" ? "CardTrader" : "Cardmarket") + " offers and are hidden by this filter.</p>");
+      }
+
+      // Source control state, however this variant draws it.
+      root.querySelectorAll('[data-act="src"]').forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.v === state.src));
+      });
+      var sel = root.querySelector('[data-act="srcsel"]');
+      if (sel) sel.value = state.src;
+
+      var n = picked().length;
+      counts.forEach(function (el) {
+        if (variant === "c") {
+          el.innerHTML = "<b>" + n + " of " + REFRESHABLE.length + " cards</b> selected for the next scrape" +
+            (n ? " · ~" + (n * COST) + (n * COST === 1 ? " credit" : " credits") : "");
+        } else if (variant === "b") {
+          el.innerHTML = n ? "<b>" + n + "</b> card" + (n === 1 ? "" : "s") + " ticked for the next scrape." : "No cards ticked — the stalest go first.";
+        } else {
+          el.innerHTML = "<b>" + n + "</b> of " + REFRESHABLE.length + " selected";
+        }
+      });
+      refreshBtn.textContent = n ? "↻ CM (" + n + ")" : "↻ CM";
+      var all = root.querySelector('[data-act="all"]');
+      var none = root.querySelector('[data-act="none"]');
+      if (all) all.disabled = n === REFRESHABLE.length;
+      if (none) none.disabled = n === 0;
+    }
+
+    root.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-act], [data-pick]");
+      if (!t) return;
+      var act = t.dataset.act;
+      if (act === "src") state.src = t.dataset.v;
+      else if (act === "all") REFRESHABLE.forEach(function (nme) { state.picks[nme] = true; });
+      else if (act === "none") state.picks = {};
+      else if (act === "invert") REFRESHABLE.forEach(function (nme) { state.picks[nme] = !state.picks[nme]; });
+      else if (t.dataset.pick) state.picks[t.dataset.pick] = t.checked;
+      else return;
+      paint();
+    });
+    root.addEventListener("change", function (e) {
+      if (e.target.dataset.act === "srcsel") { state.src = e.target.value; paint(); }
+    });
+
+    paint();
+  }
+
+  document.querySelectorAll(".mock").forEach(mount);
+
+  document.querySelectorAll("[data-width]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var phone = b.dataset.width === "phone";
+      document.querySelectorAll("[data-width]").forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o.dataset.width === b.dataset.width));
+      });
+      document.querySelectorAll(".mock").forEach(function (m) { m.classList.toggle("is-phone", phone); });
+    });
+  });
+</script>
