@@ -195,3 +195,30 @@ test("a single-row page is bounded by size when there is no table marker", () =>
   const [o] = parseCardmarket(html);
   assert.equal(o.variant, null, "a link 20k characters later is page furniture, not this row");
 });
+
+// The expansion LINK, not its tooltip. Real Cardmarket rows wrap the expansion symbol in
+// an anchor to /Magic/Expansions/<Set>; reading the href beats reading the tooltip
+// because it is markup rather than display text — no brand stripping, no localisation.
+test("an expansion link names the printing when the row has no product link", () => {
+  const offers = parseCardmarket(
+    row(1, `
+      <a href="/en/Magic/Users/S">S</a>
+      <a href="https://www.cardmarket.com/en/Magic/Expansions/Commander-2016" class="expansion-symbol"></a>
+      <span class="fw-bold">0,61 €</span>
+    `) + "</table>",
+  );
+  assert.equal(offers[0].variant, "Commander 2016");
+  assert.equal(offers[0].productUrl, null, "an expansion link is not a per-offer product URL");
+});
+
+test("a product link still wins over an expansion link on the same row", () => {
+  const offers = parseCardmarket(
+    row(1, `
+      <a href="/en/Magic/Products/Singles/Zendikar/Arid-Mesa">x</a>
+      <a href="/en/Magic/Expansions/Commander-2016" class="expansion-symbol"></a>
+      <span class="fw-bold">1,00 €</span>
+    `) + "</table>",
+  );
+  assert.equal(offers[0].variant, "Zendikar");
+  assert.match(offers[0].productUrl, /\/Magic\/Products\/Singles\/Zendikar\//);
+});
