@@ -101,18 +101,20 @@ table { width: 100%; border-collapse: collapse; font-size: .92rem; table-layout:
 /* These sum to 100: with Seller gone no column is left to absorb a remainder, so any
    change here has to be balanced against the others. Set takes the lion's share —
    it holds the longest strings ("Extended Art Collectors") and is the link out. */
-col.c-price { width: 21%; } col.c-cond { width: 11%; } col.c-qty { width: 8%; }
-col.c-ship { width: 9%; } col.c-src { width: 9%; } col.c-set { width: 42%; }
+/* Set holds a 3-4 character code now, not "Extended Art Collectors", so its old 42%
+   went back to the columns that were truncating their own headers — and to Price,
+   which was cutting off four-figure listings ("10046...."). */
+col.c-price { width: 28%; } col.c-cond { width: 14%; } col.c-qty { width: 11%; }
+col.c-ship { width: 13%; } col.c-src { width: 10%; } col.c-set { width: 24%; }
 /* Filtering to one source drops the Src column (every row would say the same thing),
    so its 9% has to be given away or the widths stop summing to 100. Set takes it. */
-body.one-source col.c-set { width: 51%; }
+body.one-source col.c-set { width: 34%; }
 /* Src holds a 2-letter tag (CT/CM); the default .8rem side padding eats enough of
    its column that the tag itself ellipsises, so give the text the room instead. */
 th.c-src, td.c-src { padding-left: .35rem; padding-right: .35rem; }
 th, td { text-align: left; padding: .5rem .8rem; border-top: 1px solid #232734; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .4px; padding-right: .3rem; }
 td a { color: var(--accent2); text-decoration: none; }
-.set-code { display: none; } /* phones swap this in for .set-full (480px block) */
 .foil { color: #f5c542; font-weight: 700; font-size: .68rem; }
 .yes { color: #2ecc40; } .no { color: #ff5b52; } .unk { color: var(--muted); }
 tr.p-green  td:first-child { box-shadow: inset 3px 0 0 #2ecc40; }
@@ -173,9 +175,8 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
      merged into one price-sorted table, "is this CardTrader or Cardmarket?" is the
      question you actually have on a phone, so it earns its ~27px. The width comes
      out of Seller (the only flexing column) and a little off Ship and Set. */
-  col.c-price { width: 26%; } col.c-cond { width: 12%; } col.c-qty { width: 9%; }
-  col.c-ship { width: 9%; } col.c-src { width: 10%; } col.c-set { width: 34%; }
-  body.one-source col.c-set { width: 44%; }
+  col.c-price { width: 29%; } col.c-cond { width: 14%; } col.c-qty { width: 11%; }
+  col.c-ship { width: 13%; } col.c-src { width: 10%; } col.c-set { width: 23%; }
+  body.one-source col.c-set { width: 33%; }
   th.c-src, td.c-src { padding-left: .2rem; padding-right: .2rem; font-size: .72rem; }
-  .set-full { display: none; } .set-code { display: inline; }
 }

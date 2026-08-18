@@ -64,9 +64,13 @@
     // No Seller column: the name was eating a fifth of the table for something you
     // rarely act on, and the room is worth more to Set — which was truncating to "C…"
     // on phones. The seller is still one tap away through the Set link.
-    // Phones show the official set code (`code` in config.json) instead of the
-    // full variant name; data.json entries predating the field fall back to it.
-    cols.push({ key: "set", label: "Set", cell: (o) => `<a href="${esc(o._url)}" target="_blank"><span class="set-full">${esc(o._variant)}</span><span class="set-code">${esc(o._code || o._variant)}</span></a>` });
+    // The Set cell is the official set code (`code` in config.json for CardTrader,
+    // scraped from the row thumbnail for Cardmarket) at every width — a code is what
+    // you actually compare printings by, and the full names were long enough to
+    // truncate even on a desktop ("Starter Commander…"). The name is not lost: it is
+    // the link's tooltip. Entries predating the field fall back to the full name, so
+    // the column still has to tolerate one.
+    cols.push({ key: "set", label: "Set", cell: (o) => `<a href="${esc(o._url)}" title="${esc(o._variant)}" target="_blank">${esc(o._code || o._variant)}</a>` });
     return cols;
   }
 
