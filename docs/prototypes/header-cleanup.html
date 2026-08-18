@@ -1,0 +1,626 @@
+<title>Five JP Card Watcher Headers</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * Review page chrome. Deliberately the same system as
+   * select-source-controls.html — these pages are read side by side, and
+   * a second visual identity would only add noise. Single dark theme on
+   * purpose: every specimen is an in-situ mock of a dark dashboard, so a
+   * light ground would misreport what the change looks like.
+   * ------------------------------------------------------------------ */
+  :root {
+    --ground: #0b0d12;
+    --panel: #12151d;
+    --line: #262b38;
+    --txt: #e9ecf2;
+    --soft: #c3c8d4;
+    --muted: #8b91a3;
+    --violet: #8b7cff;
+    --teal: #36d6c3;
+    --flag: #ff6f9c;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: system-ui, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--txt); font-family: var(--sans);
+         font-size: 16px; line-height: 1.6; padding: 0 1.25rem 5rem; }
+  .page { max-width: 68rem; margin: 0 auto; display: flex; flex-direction: column; gap: 3.25rem; }
+
+  .page-head { padding-top: 3.5rem; display: flex; flex-direction: column; gap: .9rem;
+               border-bottom: 1px solid var(--line); padding-bottom: 2rem; }
+  .eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+             color: var(--muted); margin: 0; }
+  h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 4.5vw, 2.9rem);
+       line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  .lede { margin: 0; max-width: 46rem; color: var(--soft); }
+  .lede b { color: var(--txt); font-weight: 600; }
+
+  .toolbar-row { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin-top: .4rem; }
+  .switch { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .switch .cap { font-family: var(--mono); font-size: .7rem; letter-spacing: .12em;
+                 text-transform: uppercase; color: var(--muted); }
+
+  /* Segmented control for the page's own width / guides switches. */
+  .seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .seg button { font: inherit; font-size: .78rem; font-weight: 600; color: var(--muted); background: none;
+                border: 0; border-radius: 999px; padding: .25rem .8rem; cursor: pointer; white-space: nowrap; }
+  .seg button:hover { color: var(--txt); }
+  .seg button[aria-pressed="true"] { background: rgba(139,124,255,.22); color: var(--txt);
+                                     box-shadow: inset 0 0 0 1px rgba(139,124,255,.45); }
+  .seg button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* One option = one specimen block. */
+  .spec { display: flex; flex-direction: column; gap: 1.1rem; }
+  .spec-head { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }
+  .tag { font-family: var(--mono); font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+         color: var(--ground); background: var(--violet); border-radius: 5px; padding: .1rem .45rem; }
+  .tag.now { background: var(--muted); }
+  h2 { font-family: var(--serif); font-weight: 400; font-size: 1.65rem; margin: 0; letter-spacing: -.01em; }
+  .hgt { font-family: var(--mono); font-size: .7rem; color: var(--muted); letter-spacing: .06em;
+         border: 1px solid var(--line); border-radius: 999px; padding: .1rem .5rem; white-space: nowrap; }
+  .hgt b { color: var(--teal); font-weight: 600; }
+  .thesis { margin: -.4rem 0 0; color: var(--soft); max-width: 52rem; }
+  .page code { font-family: var(--mono); font-size: .88em; color: var(--teal); }
+  .page ul.flaws { margin: -.2rem 0 0; padding-left: 1.1rem; color: var(--soft); max-width: 52rem; }
+  .page ul.flaws li { margin: .25rem 0; }
+  .page ul.flaws b { color: var(--txt); font-weight: 600; }
+
+  .frame { background: #05070b; border: 1px solid var(--line); border-radius: 16px; padding: 1rem;
+           box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+
+  .notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+           background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .notes > div { background: var(--panel); padding: .85rem 1rem 1rem; }
+  .notes dt { font-family: var(--mono); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+              color: var(--muted); margin: 0 0 .35rem; }
+  .notes dd { margin: 0; font-size: .88rem; line-height: 1.55; color: #c8ccd8; }
+  .notes dd b { color: var(--txt); font-weight: 600; }
+
+  .verdict { border-top: 1px solid var(--line); padding-top: 2.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  .cmp-wrap { overflow-x: auto; }
+  table.cmp { border-collapse: collapse; width: 100%; min-width: 46rem; font-size: .88rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: .6rem .8rem; border-top: 1px solid var(--line); vertical-align: top; }
+  table.cmp thead th { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+                       color: var(--muted); border-top: 0; font-weight: 600; }
+  table.cmp tbody th { font-weight: 600; color: var(--txt); white-space: nowrap; }
+  table.cmp td { color: #c8ccd8; font-variant-numeric: tabular-nums; }
+  .verdict p { margin: 0; max-width: 52rem; color: var(--soft); }
+  .verdict b { color: var(--txt); }
+
+  /* ------------------------------------------------------------------ *
+   * Mock chrome. Lifted from shared/ui.css so the specimens render as
+   * the real page does, scoped under .mock so nothing leaks out. The
+   * phone form is a class (.is-phone) rather than a media query, because
+   * five specimens share one browser window here; the values inside it
+   * mirror the 480px block of shared/ui.css.
+   * ------------------------------------------------------------------ */
+  .mock { --bg: #0e1016; --card: #171a23; --card2: #1e222e; --mline: #2a2f3d;
+          --mtxt: #e7e9ee; --mmuted: #8b91a3; --accent: #8b7cff; --accent2: #36d6c3;
+          font-family: var(--sans); background: var(--bg); color: var(--mtxt);
+          border: 1px solid var(--mline); border-radius: 12px; overflow: hidden; }
+  .mock.is-phone { max-width: 390px; margin: 0 auto; }
+
+  /* --- today's header, verbatim from shared/ui.css --------------------- */
+  .app-head { padding: .8rem 1.2rem; background: linear-gradient(120deg, #1b1740, #15233a 60%, #122b2b);
+              border-bottom: 1px solid var(--mline); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .app-head .h { font-size: 1.15rem; font-weight: 600; margin: 0; letter-spacing: .3px; }
+  .app-head .sub { font-weight: 400; color: var(--mmuted); font-size: .8rem; margin-left: .4rem; }
+  .live { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--accent2); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none } }
+  .grow { flex: 1; }
+  .mock .meta { color: var(--mmuted); font-size: .8rem; margin: 0; }
+  .mock.is-phone .app-head { padding: .55rem .7rem; gap: .5rem .7rem; }
+  .mock.is-phone .app-head .h { font-size: 1rem; }
+  .mock.is-phone .app-head .sub { display: block; margin-left: 0; font-size: .72rem; }
+  .mock.is-phone .meta { font-size: .72rem; }
+
+  /* --- shared header pieces used by the proposals ---------------------- */
+  /* The glyph is a text emoji with an oversized box and its own baseline;
+     pinning line-height and size stops it dragging the title's first line
+     down, which is most of what looks "off" in the shipped header. */
+  .glyph { font-size: 1.05em; line-height: 1; }
+  .name { white-space: nowrap; }
+  /* Status as one <span> per clause, so a wrap breaks between clauses instead of
+     orphaning "(1180 left)". Where the line is allowed to wrap the separator is
+     space, not a middot: a `·` drawn between clauses cannot know it has landed at
+     the start of a line, and a line beginning "· CM 15/38" is worse than the
+     orphan it replaced. Single-line variants keep the dots (.dots). */
+  .segs { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.15rem; row-gap: .1rem; }
+  .segs.dots { column-gap: .5rem; }
+  .segs.dots > span + span::before { content: "·"; color: rgba(255,255,255,.25); margin-right: .5rem; }
+  .segs b { color: var(--mtxt); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; }
+  /* D drops the word "live" from the badge; the label still has to exist for a
+     screen reader, so it is hidden visually rather than deleted. */
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* --- A · Tidy stack -------------------------------------------------- */
+  .v-a .app-head { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+                   column-gap: .9rem; row-gap: .15rem; align-items: baseline; }
+  .v-a .app-head .h { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; }
+  .v-a .app-head .sub { margin-left: 0; }
+  .v-a .live { grid-column: 2; grid-row: 1; }
+  .v-a .meta { grid-column: 1 / -1; }
+  .mock.is-phone.v-a .app-head { row-gap: .1rem; }
+  .mock.is-phone.v-a .app-head .h { display: block; }
+  .mock.is-phone.v-a .app-head .sub { margin-top: .1rem; }
+
+  /* --- B · Split: identity left, status right -------------------------- */
+  .v-b .app-head { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+                   column-gap: 1.2rem; row-gap: .1rem; align-items: baseline; }
+  .v-b .app-head .h { display: flex; align-items: baseline; gap: .45rem; }
+  .v-b .app-head .sub { grid-column: 1; margin-left: 0; display: block; }
+  .v-b .live { grid-column: 2; grid-row: 1; justify-self: end; }
+  .v-b .meta { grid-column: 2; grid-row: 2; justify-self: end; text-align: right; }
+  .v-b .segs { justify-content: flex-end; }
+  .mock.is-phone.v-b .app-head { grid-template-columns: minmax(0, 1fr) auto; row-gap: .15rem; }
+  .mock.is-phone.v-b .meta { grid-column: 1 / -1; grid-row: 3; justify-self: start; text-align: left; }
+  .mock.is-phone.v-b .segs { justify-content: flex-start; }
+
+  /* --- C · Status chips ------------------------------------------------ */
+  .v-c .app-head { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+                   column-gap: .9rem; row-gap: .45rem; align-items: center; }
+  .v-c .app-head .h { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; }
+  .v-c .app-head .sub { margin-left: 0; }
+  .v-c .live { grid-column: 2; grid-row: 1; }
+  .v-c .chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem; }
+  /* Same pill vocabulary as the freshness chip on every card, so the header
+     reads as part of the same page rather than a second design. */
+  .v-c .st { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 600;
+             color: var(--mmuted); background: var(--card2); border: 1px solid var(--mline);
+             border-radius: 999px; padding: .15rem .55rem; font-variant-numeric: tabular-nums; }
+  .v-c .st b { color: var(--mtxt); font-weight: 700; }
+  .v-c .st .k { font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+  .v-c .bar { width: 34px; height: 4px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .v-c .bar i { display: block; height: 100%; width: 39%; background: var(--accent2); border-radius: 999px; }
+  .mock.is-phone.v-c .app-head { row-gap: .4rem; }
+  .mock.is-phone.v-c .app-head .h { display: block; }
+
+  /* --- D · Quiet two-liner -------------------------------------------- */
+  .v-d .app-head { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+                   column-gap: .8rem; row-gap: .1rem; align-items: baseline; padding: .65rem 1.2rem; }
+  .v-d .app-head .h { display: flex; align-items: baseline; gap: .4rem; }
+  /* The word "live" goes: the pulse already says it, and on a phone those
+     four characters cost a whole column of the title line. */
+  .v-d .pulse { grid-column: 2; grid-row: 1; align-self: center; }
+  .v-d .app-head .sub { margin-left: .5rem; padding-left: .55rem; border-left: 1px solid rgba(255,255,255,.16); }
+  .v-d .meta { grid-column: 1 / -1; }
+  .mock.is-phone.v-d .app-head { padding: .5rem .7rem; }
+  .mock.is-phone.v-d .app-head .sub { display: none; }
+  .mock.is-phone.v-d .meta { font-size: .71rem; white-space: nowrap; }
+
+  /* --- E · Data rail -------------------------------------------------- */
+  .v-e .app-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+                   column-gap: .7rem; row-gap: .6rem; align-items: center; }
+  /* A tile, not a loose glyph: the emoji gets a box of its own so it stops
+     reading as a typo in front of the title. */
+  .v-e .tile { grid-column: 1; grid-row: 1; display: grid; place-items: center; width: 2rem; height: 2rem;
+               font-size: 1.05rem; line-height: 1; border-radius: 9px; background: rgba(255,255,255,.07);
+               border: 1px solid rgba(255,255,255,.1); }
+  .v-e .idy { grid-column: 2; grid-row: 1; min-width: 0; }
+  .v-e .app-head .h { display: block; }
+  .v-e .app-head .sub { display: block; margin-left: 0; font-size: .74rem; }
+  .v-e .live { grid-column: 3; grid-row: 1; }
+  .v-e .rail { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+  .v-e .rail > div { display: flex; flex-direction: column; gap: .1rem; padding: 0 .9rem;
+                     border-left: 1px solid rgba(255,255,255,.1); }
+  .v-e .rail > div:first-child { padding-left: 0; border-left: 0; }
+  .v-e .rail dt { font-family: var(--mono); font-size: .6rem; line-height: 1.2; letter-spacing: .13em;
+                  text-transform: uppercase; color: var(--mmuted); margin: 0; }
+  .v-e .rail dd { margin: 0; font-size: .82rem; line-height: 1.25; font-weight: 600; color: var(--mtxt);
+                  font-variant-numeric: tabular-nums; }
+  .v-e .rail dd .q { color: var(--mmuted); font-weight: 400; }
+  /* On a phone the rail folds to 2x2 and the branding line goes: the four labelled
+     fields already say what the page is watching, and keeping both put the header
+     over 170px — nearly a fifth of the screen before a single price. */
+  .mock.is-phone.v-e .app-head { row-gap: .5rem; }
+  .mock.is-phone.v-e .app-head .sub { display: none; }
+  .mock.is-phone.v-e .tile { width: 1.7rem; height: 1.7rem; font-size: .95rem; }
+  .mock.is-phone.v-e .rail { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem 0; }
+  .mock.is-phone.v-e .rail > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .mock.is-phone.v-e .rail > div { padding: 0 .7rem; }
+  .mock.is-phone.v-e .rail dd { font-size: .8rem; }
+
+  /* --- alignment guides ------------------------------------------------ */
+  /* A review aid, not a design: outlines every header child and drops a rule
+     on the content's left edge, which is where today's header comes apart. */
+  .mock.is-guides .app-head { position: relative; }
+  .mock.is-guides .app-head > *, .mock.is-guides .app-head .sub {
+    outline: 1px dashed rgba(255,111,156,.65); outline-offset: 1px; }
+  .mock.is-guides .app-head::after { content: ""; position: absolute; top: 0; bottom: 0; left: 1.2rem;
+    border-left: 1px solid rgba(54,214,195,.55); pointer-events: none; }
+  .mock.is-guides.is-phone .app-head::after { left: .7rem; }
+
+  /* --- context below the header --------------------------------------- */
+  .toolbar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+             padding: .5rem 1.2rem; background: #0b0c11; border-bottom: 1px solid var(--mline); }
+  .tb-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mmuted); }
+  .tb-count { font-size: .75rem; color: var(--mmuted); font-variant-numeric: tabular-nums; }
+  .tb-count b { color: var(--mtxt); font-weight: 600; }
+  .tb-sep { width: 1px; align-self: stretch; background: var(--mline); margin: 0 .2rem; }
+  .mock .seg { background: rgba(0,0,0,.3); }
+  .mock .seg button { font-size: .75rem; padding: .18rem .7rem; }
+  .btn { font: inherit; font-size: .75rem; font-weight: 600; color: var(--mmuted); background: rgba(255,255,255,.03);
+         border: 1px solid var(--mline); border-radius: 999px; padding: .2rem .65rem; cursor: pointer; white-space: nowrap; }
+  .refresh { font: inherit; font-size: .75rem; font-weight: 600; color: var(--accent2);
+             background: rgba(54,214,195,.1); border: 1px solid rgba(54,214,195,.35); border-radius: 999px;
+             padding: .2rem .6rem; cursor: pointer; white-space: nowrap; }
+  .refresh.key { padding: .2rem .45rem; }
+  .mock .legend { color: var(--mmuted); font-size: .78rem; line-height: 1.5; padding: .8rem 1.2rem 0; }
+  .mock .legend .label { color: var(--mtxt); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; padding: .9rem 1.2rem 1.1rem; }
+  .mock.is-phone .toolbar { padding: .45rem .7rem; gap: .4rem .45rem; }
+  .mock.is-phone .legend { padding: .7rem .7rem 0; }
+  .mock.is-phone .grid { grid-template-columns: minmax(0, 1fr); padding: .7rem; }
+  .card { background: var(--card); border: 1px solid var(--mline); border-radius: 14px; overflow: hidden; }
+  .card .ttl { font-size: 1.02rem; font-weight: 600; margin: 0; padding: .6rem .8rem; display: flex;
+               align-items: center; gap: .5rem;
+               background: linear-gradient(90deg, rgba(139,124,255,.18), transparent); border-bottom: 1px solid var(--mline); }
+  .card .ttl .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: .78rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px; background: var(--accent); color: #0b0b12; }
+  .age { font-size: .66rem; font-weight: 600; letter-spacing: .3px; padding: .12rem .42rem; border-radius: 999px;
+         background: var(--card2); color: var(--mmuted); border: 1px solid var(--mline); font-variant-numeric: tabular-nums; }
+  .pick { flex: 0 0 auto; width: 1rem; height: 1rem; margin: 0 .1rem 0 0; accent-color: var(--accent); color-scheme: dark; }
+  .card .rows { padding: .1rem 0 .3rem; }
+  .card .rows p { display: flex; gap: .5rem; margin: 0; padding: .35rem .8rem; border-top: 1px solid #232734;
+                  font-size: .84rem; color: #c8ccd8; font-variant-numeric: tabular-nums; }
+  .card .rows p span:first-child { color: var(--mtxt); font-weight: 600; }
+  .card .rows p .sp { margin-left: auto; color: var(--accent2); }
+
+  /* Measuring rig for the "height at 390px" figures. Off-screen, never seen. */
+  #rig { position: absolute; left: -10000px; top: 0; width: 390px; }
+
+  @media (max-width: 720px) {
+    .notes { grid-template-columns: minmax(0, 1fr); }
+    .frame { padding: .6rem; }
+  }
+</style>
+
+<main class="page">
+  <header class="page-head">
+    <p class="eyebrow">JP Card Watcher · UI proposal</p>
+    <h1>Five ways to tidy the header</h1>
+    <p class="lede">
+      The header carries three things — who this is, whether the feed is alive, and what the
+      last refresh found. Today they are laid out by one flex row with <code>align-items: center</code>
+      and a <code>gap: 1rem</code>, which on a phone leaves <b>live</b> floating in the middle of nothing,
+      breaks the status line mid-clause, and stacks three type sizes on three different rhythms.
+      Each proposal below is the same content, relaid. Nothing in the real site has changed yet.
+    </p>
+    <div class="toolbar-row">
+      <div class="switch">
+        <span class="cap">Preview at</span>
+        <div class="seg" role="group" aria-label="Preview width">
+          <button type="button" data-width="desktop" aria-pressed="true">Desktop</button>
+          <button type="button" data-width="phone" aria-pressed="false">Phone · 390px</button>
+        </div>
+      </div>
+      <div class="switch">
+        <span class="cap">Guides</span>
+        <div class="seg" role="group" aria-label="Alignment guides">
+          <button type="button" data-guides="off" aria-pressed="true">Off</button>
+          <button type="button" data-guides="on" aria-pressed="false">On</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag now">NOW</span>
+      <h2>What ships today</h2>
+      <span class="hgt" data-h="now"></span>
+    </div>
+    <p class="thesis">
+      For reference, and worth switching <b>Guides</b> on for: the dashes show what each header child
+      actually occupies, the teal rule shows the content's left edge.
+    </p>
+    <div class="frame"><div class="mock v-now" data-variant="now"></div></div>
+    <ul class="flaws">
+      <li><b>“live” has nothing to align to.</b> It is centred against the whole <code>h1</code> box, which on a
+        phone is two lines tall, so the badge lands in the gap between title and subtitle.</li>
+      <li><b>The status line breaks mid-clause</b> — <code>CM 15/38 credits today</code> on one line,
+        <code>(1180 left)</code> orphaned on the next — because it is a single text node that wraps wherever it runs out.</li>
+      <li><b>Three rhythms in three lines.</b> The <code>gap: .5rem .7rem</code> between flex lines, the subtitle's
+        own block margin and the meta line's leading are all different, so nothing sits on a grid.</li>
+      <li><b>🃏 sits low and wide.</b> An emoji brings its own line box; at <code>1rem</code> it pushes the title's
+        first line down and adds a visible notch of space before the "J".</li>
+    </ul>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">A</span>
+      <h2>Tidy stack</h2>
+      <span class="hgt" data-h="a"></span>
+    </div>
+    <p class="thesis">
+      The same anatomy, corrected. A two-column grid pins <b>live</b> to the title's own row so it
+      aligns with the name's baseline, the rows share one tight rhythm, and the glyph gets a fixed
+      line box. Nothing moves that did not need to.
+    </p>
+    <div class="frame"><div class="mock v-a" data-variant="a"></div></div>
+    <dl class="notes">
+      <div><dt>What changes</dt><dd><b><code>ui.css</code> only</b> — <code>header</code> becomes a grid, plus a <code>.glyph</code> span in <code>index.html</code>. No <code>app.js</code> change: the status line stays one text node.</dd></div>
+      <div><dt>Wins</dt><dd>Smallest diff of the five, and the only one that leaves the status string alone. Alignment and rhythm are fixed at both widths.</dd></div>
+      <div><dt>Costs</dt><dd>The status line still wraps wherever it runs out of room, so <b>“(1180 left)”</b> can still orphan on a narrow phone.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">B</span>
+      <h2>Split band</h2>
+      <span class="hgt" data-h="b"></span>
+    </div>
+    <p class="thesis">
+      Identity on the left, status on the right, both flush to their own edge. The empty middle
+      becomes deliberate space rather than a gap something fell into, and the two right-aligned
+      lines read as one status block.
+    </p>
+    <div class="frame"><div class="mock v-b" data-variant="b"></div></div>
+    <dl class="notes">
+      <div><dt>What changes</dt><dd>Grid in <code>ui.css</code>, plus <code>app.js</code> emitting one <code>&lt;span&gt;</code> per clause. The middots become wide spaces — a <code>·</code> between clauses cannot know it has landed at the start of a line.</dd></div>
+      <div><dt>Wins</dt><dd>Strongest desktop composition — a real left and right edge, tabular numerals, and no floating badge. Reads like a status bar.</dd></div>
+      <div><dt>Costs</dt><dd>Right-alignment stops working at 390px, so the phone form has to fall back to a left-aligned third row: two layouts to maintain.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">C</span>
+      <h2>Status chips</h2>
+      <span class="hgt" data-h="c"></span>
+    </div>
+    <p class="thesis">
+      The status line stops being a sentence. Each fact becomes a pill in the same vocabulary as the
+      freshness chip on every card — so a wrap can only ever break <em>between</em> facts, and the
+      credit figure gets a meter you can read without doing the division.
+    </p>
+    <div class="frame"><div class="mock v-c" data-variant="c"></div></div>
+    <dl class="notes">
+      <div><dt>What changes</dt><dd>Most <code>app.js</code> work: <code>cmSummary()</code> returns chip markup instead of a string. New <code>.st</code> pill and meter in <code>ui.css</code>.</dd></div>
+      <div><dt>Wins</dt><dd>Scannable rather than readable — the three numbers you actually check are three separate objects, and the meter answers “how much of today is left?” at a glance.</dd></div>
+      <div><dt>Costs</dt><dd>Tallest of the five, and the chips compete with the control strip directly below them; the header stops being quiet chrome.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">D</span>
+      <h2>Quiet two-liner</h2>
+      <span class="hgt" data-h="d"></span>
+    </div>
+    <p class="thesis">
+      Cut instead of arrange. The word <b>live</b> goes — the pulse already says it — the subtitle
+      becomes a hairline-divided tail that drops on phones, and the status shortens to
+      <code>14:01 · 316 offers · CM 15/38 (1180 left)</code>, which fits 390px on one line with room to spare.
+    </p>
+    <div class="frame"><div class="mock v-d" data-variant="d"></div></div>
+    <dl class="notes">
+      <div><dt>What changes</dt><dd>Grid in <code>ui.css</code>; <code>app.js</code> shortens the string (time only, <code>15/38</code> without “credits today”) and the badge loses its label to a <code>title</code> plus visually-hidden text.</dd></div>
+      <div><dt>Wins</dt><dd>Roughly half today's header height on a phone, no wrapping at any width, and the grid starts higher up the screen.</dd></div>
+      <div><dt>Costs</dt><dd>Loses the date, the word “credits”, and the branding line on phones. A bare pulsing dot is a weaker affordance than a labelled badge.</dd></div>
+    </dl>
+  </section>
+
+  <section class="spec">
+    <div class="spec-head">
+      <span class="tag">E</span>
+      <h2>Data rail</h2>
+      <span class="hgt" data-h="e"></span>
+    </div>
+    <p class="thesis">
+      Treat the status as data, not prose: four labelled fields on a divided rail, values in tabular
+      numerals on one baseline. The glyph becomes a tile so it reads as a mark rather than a stray
+      character, and on a phone the rail folds to a 2×2 grid instead of wrapping.
+    </p>
+    <div class="frame"><div class="mock v-e" data-variant="e"></div></div>
+    <dl class="notes">
+      <div><dt>What changes</dt><dd><code>app.js</code> emits four label/value pairs instead of a sentence; <code>ui.css</code> gains the rail. The <code>⚿</code>/<code>↻ CM</code> strip below is untouched.</dd></div>
+      <div><dt>Wins</dt><dd>Most legible numbers of the five — the micro-labels mean the values need no words around them, so nothing has to be abbreviated to fit.</dd></div>
+      <div><dt>Costs</dt><dd>The most furniture: 8 new elements and a second uppercase label style competing with the strip's <b>SOURCE</b>. Formal enough to feel like a different product.</dd></div>
+    </dl>
+  </section>
+
+  <section class="verdict">
+    <h2>Picking between them</h2>
+    <div class="cmp-wrap">
+      <table class="cmp">
+        <thead>
+          <tr><th>&nbsp;</th><th>A · Tidy</th><th>B · Split</th><th>C · Chips</th><th>D · Quiet</th><th>E · Rail</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Phone height</th><td data-cell="a"></td><td data-cell="b"></td><td data-cell="c"></td><td data-cell="d"></td><td data-cell="e"></td></tr>
+          <tr><th>Wraps cleanly</th><td>No — same text node</td><td>Yes, between clauses</td><td>Yes, between chips</td><td>Never wraps</td><td>Folds to 2×2</td></tr>
+          <tr><th>Keeps full status</th><td>Yes</td><td>Yes</td><td>Yes</td><td>No — date and wording cut</td><td>Yes</td></tr>
+          <tr><th>Files touched</th><td>css + html</td><td>css + html + js</td><td>css + html + js</td><td>css + html + js</td><td>css + html + js</td></tr>
+          <tr><th>Work to build</th><td>Small</td><td>Small-medium</td><td>Medium</td><td>Small-medium</td><td>Medium</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <b>My pick is B, with D's shortening applied to the phone form.</b> The split band fixes the actual
+      complaint — a badge aligned to nothing and a sentence that breaks in the wrong place — without
+      inventing new furniture above a control strip that is already dense. Per-clause spans are a
+      four-line change in <code>app.js</code> and they are what every option except A depends on, so
+      they are worth doing regardless.
+    </p>
+    <p>
+      <b>A</b> is the right answer if you want this shipped in one commit and judged on a desktop.
+      <b>C</b> and <b>E</b> both make the numbers better and the page busier; they are worth it only if
+      the credit budget deserves permanent prominence, which the legend arguably already covers.
+      Whichever wins, the same two invariants hold: the header keeps its opaque background and its
+      <code>.topbar</code> pairing with the strip, and <code>verify-mobile.js</code> has to stay at zero
+      horizontal overflow at 320px — the narrowest form, not 390px, is what constrains every one of these.
+    </p>
+  </section>
+</main>
+<div id="rig" aria-hidden="true"></div>
+
+<script>
+  /* One header's worth of content, fixed rather than live, so the specimens are
+     comparable and the page renders the same every time. Values are the ones in
+     the reported screenshot. */
+  var T = {
+    stamp: "updated 18/08/2026, 14:01:06",
+    offers: "316 offers",
+    credits: "CM 15/38 credits today",
+    left: "(1180 left)",
+    shortStamp: "14:01",
+    shortCredits: "CM 15/38 (1180 left)"
+  };
+
+  var GLYPH = '<span class="glyph">🃏</span>';
+  var SUB = "CardTrader · Cardmarket · Japanese";
+  var LIVE = '<span class="live"><span class="dot"></span>live</span>';
+
+  /* Status as one span per clause. Separators are drawn by CSS, so a line break
+     lands between clauses and never inside one. */
+  function segs(parts, mod) {
+    return '<p class="meta segs' + (mod ? " " + mod : "") + '">' + parts.map(function (p) {
+      return '<span class="num">' + p + "</span>";
+    }).join("") + "</p>";
+  }
+
+  var HEADS = {
+    /* Verbatim reconstruction of today's markup: h1 with an inline .sub, a .live
+       badge, a flex spacer, then the status as a single text node. */
+    now:
+      '<div class="app-head">' +
+        '<h1 class="h">🃏 JP Card Watcher <span class="sub">' + SUB + "</span></h1>" +
+        LIVE + '<span class="grow"></span>' +
+        '<span class="meta">' + T.stamp + " · " + T.offers + " · " + T.credits + " " + T.left + "</span>" +
+      "</div>",
+
+    a:
+      '<div class="app-head">' +
+        '<h1 class="h">' + GLYPH + '<span class="name">JP Card Watcher</span>' +
+          '<span class="sub">' + SUB + "</span></h1>" +
+        LIVE +
+        '<p class="meta num">' + T.stamp + " · " + T.offers + " · " + T.credits + " " + T.left + "</p>" +
+      "</div>",
+
+    b:
+      '<div class="app-head">' +
+        '<h1 class="h">' + GLYPH + '<span class="name">JP Card Watcher</span></h1>' +
+        '<span class="sub">' + SUB + "</span>" +
+        LIVE +
+        segs([T.stamp, T.offers, T.credits + " " + T.left]) +
+      "</div>",
+
+    c:
+      '<div class="app-head">' +
+        '<h1 class="h">' + GLYPH + '<span class="name">JP Card Watcher</span>' +
+          '<span class="sub">' + SUB + "</span></h1>" +
+        LIVE +
+        '<div class="chips">' +
+          '<span class="st"><span class="k">updated</span><b>14:01:06</b></span>' +
+          '<span class="st"><b>316</b> offers</span>' +
+          '<span class="st"><span class="k">cm today</span><b>15</b>/38 cr' +
+            '<span class="bar" role="img" aria-label="15 of 38 credits used today"><i></i></span></span>' +
+          '<span class="st"><span class="k">balance</span><b>1180</b></span>' +
+        "</div>" +
+      "</div>",
+
+    d:
+      '<div class="app-head">' +
+        '<h1 class="h">' + GLYPH + '<span class="name">JP Card Watcher</span>' +
+          '<span class="sub">' + SUB + "</span></h1>" +
+        '<span class="live pulse" title="live"><span class="dot"></span>' +
+          '<span class="sr">live</span></span>' +
+        segs([T.shortStamp, T.offers, T.shortCredits], "dots") +
+      "</div>",
+
+    e:
+      '<div class="app-head">' +
+        '<span class="tile" aria-hidden="true">🃏</span>' +
+        '<span class="idy"><h1 class="h"><span class="name">JP Card Watcher</span></h1>' +
+          '<span class="sub">' + SUB + "</span></span>" +
+        LIVE +
+        '<dl class="rail">' +
+          "<div><dt>Updated</dt><dd>14:01:06</dd></div>" +
+          "<div><dt>Offers</dt><dd>316</dd></div>" +
+          "<div><dt>CM credits</dt><dd>15<span class=\"q\"> / 38 today</span></dd></div>" +
+          "<div><dt>Balance</dt><dd>1180</dd></div>" +
+        "</dl>" +
+      "</div>"
+  };
+
+  /* Everything below the header, identical in every specimen — the header is only
+     judgeable against the strip it has to meet and the grid it sits over. */
+  var BELOW =
+    '<div class="toolbar">' +
+      '<span class="tb-label">Source</span>' +
+      '<div class="seg" role="group" aria-label="Source filter">' +
+        '<button type="button" aria-pressed="true">Both</button>' +
+        '<button type="button" aria-pressed="false">CT</button>' +
+        '<button type="button" aria-pressed="false">CM</button></div>' +
+      '<span class="grow"></span>' +
+      '<span class="tb-count"><b>1</b> of 17 selected</span>' +
+      '<button class="btn" type="button">Select all</button>' +
+      '<button class="btn" type="button">Clear</button>' +
+      '<span class="tb-sep"></span>' +
+      '<button class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>' +
+      '<button class="refresh" type="button">↻ CM</button>' +
+    "</div>" +
+    '<div class="legend"><span class="label">Cardmarket is scraped only when you ask.</span> ' +
+      "Nothing refreshes it on a timer — it costs credits, so it waits for you.</div>" +
+    '<div class="grid">' +
+      card("Runehorn Hellkite", "3h", 4, [["3.99 €", "NM", "CM"], ["4.11 €", "NM", "CT"]]) +
+      card("Stock Up", "5h", 3, [["2.80 €", "NM", "CT"], ["3.15 €", "NM", "CM"]]) +
+    "</div>";
+
+  function card(name, chip, count, rows) {
+    return '<div class="card"><p class="ttl">' +
+      '<input type="checkbox" class="pick" aria-label="Include ' + name + ' in the next refresh">' +
+      '<span class="nm">' + name + "</span>" +
+      '<span class="age">' + chip + "</span>" +
+      '<span class="badge">' + count + "</span></p>" +
+      '<div class="rows">' + rows.map(function (r) {
+        return "<p><span>" + r[0] + "</span><span>" + r[1] + "</span><span class=\"sp\">" + r[2] + "</span></p>";
+      }).join("") + "</div></div>";
+  }
+
+  document.querySelectorAll(".mock").forEach(function (m) {
+    m.innerHTML = HEADS[m.dataset.variant] + BELOW;
+  });
+
+  /* Height figures are measured, not asserted: each header is rendered off-screen
+     in a 390px-wide phone-class mock and read back, so the numbers in the notes
+     and the comparison table cannot drift from the CSS above them. */
+  var rig = document.getElementById("rig");
+  Object.keys(HEADS).forEach(function (k) {
+    rig.innerHTML = '<div class="mock is-phone v-' + k + '">' + HEADS[k] + "</div>";
+    var h = Math.round(rig.querySelector(".app-head").getBoundingClientRect().height);
+    var pill = document.querySelector('[data-h="' + k + '"]');
+    if (pill) pill.innerHTML = "at 390px: <b>" + h + "px</b>" +
+      (k === "now" ? "" : " · " + (h > window.__nowH ? "+" : "") + Math.round(h - window.__nowH) + "px vs now");
+    if (k === "now") window.__nowH = h;
+    var cell = document.querySelector('[data-cell="' + k + '"]');
+    if (cell) cell.textContent = h + "px (" + (h > window.__nowH ? "+" : "") + (h - window.__nowH) + ")";
+  });
+  rig.innerHTML = "";
+
+  document.querySelectorAll("[data-width]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var phone = b.dataset.width === "phone";
+      document.querySelectorAll("[data-width]").forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      document.querySelectorAll(".mock").forEach(function (m) { m.classList.toggle("is-phone", phone); });
+    });
+  });
+
+  document.querySelectorAll("[data-guides]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var on = b.dataset.guides === "on";
+      document.querySelectorAll("[data-guides]").forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      document.querySelectorAll(".mock").forEach(function (m) { m.classList.toggle("is-guides", on); });
+    });
+  });
+</script>
