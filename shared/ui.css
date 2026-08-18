@@ -38,8 +38,14 @@ header .sub { display: block; font-weight: 400; color: var(--muted); font-size: 
    "CM 15/38 credits today" — so the numbers keep their room at every width. Fields are
    divided by a hairline rather than a middot: a separator drawn between inline clauses
    cannot know it has landed at the start of a wrapped line. */
-.rail { grid-column: 1 / -1; grid-row: 2; margin: 0; display: flex; flex-wrap: wrap; align-items: stretch; }
-.rail > div { display: flex; flex-direction: column; gap: .1rem; padding: 0 .9rem;
+.rail { grid-column: 1 / -1; grid-row: 2; margin: 0; display: flex; flex-wrap: nowrap; align-items: stretch; }
+/* nowrap, and every field free to shrink: the divider is a left border reset on the
+   first field only, so a wrapped line would open with a divider that has nothing
+   before it. Squeezed, a field's value wraps inside its own cell instead — one line
+   taller, still four labelled columns. Worst case (a stale date-and-time stamp,
+   four-digit balance, three-digit allowance) needs ~475px of the ~443px available at
+   481px, so this band is reached in practice, not just in theory. */
+.rail > div { min-width: 0; display: flex; flex-direction: column; gap: .1rem; padding: 0 .9rem;
   border-left: 1px solid rgba(255,255,255,.1); }
 .rail > div:first-child { padding-left: 0; border-left: 0; }
 .rail dt { margin: 0; font-size: .6rem; line-height: 1.2; font-weight: 600; letter-spacing: .13em;
@@ -193,15 +199,22 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
   .ctl-more { display: none; }
   .ctl-sep { display: none; }
   header h1 { font-size: 1rem; }
-  /* PROVISIONAL phone form of the rail, pending a decision on the mobile layout: it
-     folds to 2x2 and drops the branding line, because the four labelled fields already
-     say what the page is watching and keeping both put the header near 170px — a fifth
-     of the screen before a single price. See docs/prototypes/header-cleanup.html. */
+  /* The rail folds to 2x2 rather than shrinking to four columns — four labelled fields
+     across 320px would leave each value about 60px, which the timestamp alone exceeds.
+     The branding line goes with it: the fields already say what the page is watching,
+     and keeping both put the header near 170px, a fifth of the screen before a single
+     price. Grid, not flex, so the fold is stated rather than left to wrapping — that is
+     what makes :nth-child(odd) a reliable "first in its row". The first column is the
+     wider one: it carries the two long values (the timestamp and the credit ratio),
+     while Offers and Balance are bare numbers. */
   header .sub { display: none; }
   .mark { width: 1.7rem; height: 1.7rem; font-size: .95rem; }
-  .rail { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem 0; }
+  .rail { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: .45rem 0; }
   .rail > div { padding: 0 .7rem; }
   .rail > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+  /* The second row gets a rule of its own so the four fields read as a grid of cells
+     rather than two unrelated pairs. */
+  .rail > div:nth-child(n+3) { padding-top: .45rem; border-top: 1px solid rgba(255,255,255,.08); }
   .rail dd { font-size: .8rem; }
   #grid { gap: .7rem; }
   .card h2 { font-size: .95rem; padding: .55rem .7rem; }
