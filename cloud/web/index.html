@@ -13,11 +13,20 @@
      without scrolling back up. Wrapping them is what makes that a two-line CSS change —
      the strip alone would need the header's height, which changes as the header wraps. -->
 <div class="topbar">
+<!-- Four children, laid out by the grid in ui.css: mark, identity, live badge, and the
+     status rail app.js fills. The status used to be one dot-separated sentence in a
+     single text node, which wrapped wherever it ran out of room — "(1180 left)" ended up
+     orphaned on its own line on a phone. Labelled fields cannot break mid-clause, and
+     they let the values lose their explanatory words ("credits today") instead of the
+     numbers losing their room. -->
 <header>
-  <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Cardmarket · Japanese</span></h1>
+  <span class="mark" aria-hidden="true">🃏</span>
+  <span class="brand">
+    <h1>JP Card Watcher</h1>
+    <span class="sub">CardTrader · Cardmarket · Japanese</span>
+  </span>
   <span class="live"><span class="dot"></span>live</span>
-  <span class="spacer"></span>
-  <span id="updated" class="meta">loading…</span>
+  <dl id="stats" class="rail"><div><dt>Updated</dt><dd>loading…</dd></div></dl>
 </header>
 <!-- Control strip: everything that decides what the next refresh shows and costs.
      Left is free (a client-side filter over the merged feeds); right spends credits.

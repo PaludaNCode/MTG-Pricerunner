@@ -159,8 +159,9 @@ function check(ok, msg) {
     "the legend says Cardmarket is on-demand, not scheduled",
   );
   check(
-    (await page.locator("#updated").textContent()).includes("credits today"),
-    "the header reports today's credit spend, not the file's age",
+    /CM CREDITS/i.test(await page.locator("#stats").textContent()) &&
+      /\/ \d+ today/.test(await page.locator("#stats").textContent()),
+    "the header's status rail reports today's credit spend against the allowance, not the file's age",
   );
   await page.close();
 

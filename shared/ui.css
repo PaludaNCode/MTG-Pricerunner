@@ -9,16 +9,46 @@ body { font-family: system-ui, "Segoe UI", sans-serif; margin: 0; padding: 0 1re
    knowing the header's height, which changes whenever the header wraps; sticking their
    wrapper needs no number at all. Below 700px it reverts to a sticky header only. */
 .topbar { position: sticky; top: 0; z-index: 5; }
+/* Two rows on an explicit grid, not one flex line: identity across the top, the status
+   rail beneath it. A flex row centred every child against the tallest of them, which is
+   how the live badge ended up floating in the gap beside a two-line title, and it left
+   the status to wrap wherever it ran out of room. Rows here are a fixed rhythm and each
+   child names its own cell, so nothing is positioned by what happens to sit next to it. */
 header { position: sticky; top: 0; z-index: 5; margin: 0 -1rem 1rem; padding: .8rem 1.2rem;
   background: linear-gradient(120deg, #1b1740, #15233a 60%, #122b2b);
-  border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: .7rem; row-gap: .6rem;
+  align-items: center; }
+/* The emoji gets a box of its own. Loose in the h1 it brought its own oversized line
+   box, pushing the title's first line down and leaving a notch of space before the "J". */
+.mark { grid-column: 1; grid-row: 1; display: grid; place-items: center; width: 2rem; height: 2rem;
+  font-size: 1.05rem; line-height: 1; border-radius: 9px;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); }
+.brand { grid-column: 2; grid-row: 1; min-width: 0; }
 header h1 { font-size: 1.15rem; margin: 0; letter-spacing: .3px; }
-header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin-left: .4rem; }
-.live { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--accent2); font-weight: 600; }
+header .sub { display: block; font-weight: 400; color: var(--muted); font-size: .74rem; }
+.live { grid-column: 3; grid-row: 1; display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .8rem; color: var(--accent2); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); animation: pulse 1.8s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none } }
 .spacer { flex: 1; }
-.meta { color: var(--muted); font-size: .8rem; }
+/* Status rail: one labelled field per fact, filled by app.js. The label is what lets the
+   value drop its explanatory words — "CM credits / 15 / 38 today" instead of
+   "CM 15/38 credits today" — so the numbers keep their room at every width. Fields are
+   divided by a hairline rather than a middot: a separator drawn between inline clauses
+   cannot know it has landed at the start of a wrapped line. */
+.rail { grid-column: 1 / -1; grid-row: 2; margin: 0; display: flex; flex-wrap: wrap; align-items: stretch; }
+.rail > div { display: flex; flex-direction: column; gap: .1rem; padding: 0 .9rem;
+  border-left: 1px solid rgba(255,255,255,.1); }
+.rail > div:first-child { padding-left: 0; border-left: 0; }
+.rail dt { margin: 0; font-size: .6rem; line-height: 1.2; font-weight: 600; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--muted); }
+.rail dd { margin: 0; font-size: .82rem; line-height: 1.25; font-weight: 600; color: var(--txt);
+  font-variant-numeric: tabular-nums; }
+/* The part of a value that is context rather than the number itself: "/ 38 today". */
+.rail dd .q { color: var(--muted); font-weight: 400; }
+.rail dd.bad { color: #ff8a8a; font-weight: 400; }
 /* On-demand Cardmarket scrape. Sits in the header next to the timestamp; goes flat and
    muted while a run is in flight or once the day's credit allowance is gone. */
 .refresh { font: inherit; font-size: .75rem; font-weight: 600; color: var(--accent2);
@@ -153,7 +183,7 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
 }
 @media (max-width: 480px) {
   body { padding: 0 .55rem 1.5rem; }
-  header { margin: 0 -.55rem .8rem; padding: .55rem .7rem; gap: .5rem .7rem; }
+  header { margin: 0 -.55rem .8rem; padding: .55rem .7rem; column-gap: .6rem; row-gap: .5rem; }
   /* The strip wraps to two lines here: filter on the first, selection on the second.
      Margins track the header's so the band still meets it edge to edge. */
   .controls { margin: -.8rem -.55rem .7rem; padding: .45rem .7rem; gap: .4rem .45rem; }
@@ -163,8 +193,16 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
   .ctl-more { display: none; }
   .ctl-sep { display: none; }
   header h1 { font-size: 1rem; }
-  header h1 .sub { display: block; margin-left: 0; font-size: .72rem; }
-  .meta { font-size: .72rem; }
+  /* PROVISIONAL phone form of the rail, pending a decision on the mobile layout: it
+     folds to 2x2 and drops the branding line, because the four labelled fields already
+     say what the page is watching and keeping both put the header near 170px — a fifth
+     of the screen before a single price. See docs/prototypes/header-cleanup.html. */
+  header .sub { display: none; }
+  .mark { width: 1.7rem; height: 1.7rem; font-size: .95rem; }
+  .rail { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem 0; }
+  .rail > div { padding: 0 .7rem; }
+  .rail > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .rail dd { font-size: .8rem; }
   #grid { gap: .7rem; }
   .card h2 { font-size: .95rem; padding: .55rem .7rem; }
   .card:hover { transform: none; }
