@@ -1,5 +1,6 @@
 // UI smoke test: serve cloud/web, render the dashboard at three viewports,
-// screenshot, and FAIL (exit 1) on horizontal overflow or zero rendered cards.
+// screenshot, and FAIL (exit 1) on horizontal overflow, zero rendered cards, or a
+// header status rail that has lost its shape (2x2 on phones, one row above 480px).
 // Self-contained: copies the shared UI into web/ and falls back to the committed
 // fixture when no live data.json exists (CI never hits the real APIs).
 const http = require("http");
@@ -47,9 +48,29 @@ const server = http.createServer((req, res) => {
     await page.waitForSelector("#grid .card", { timeout: 10000 }).catch(() => {});
     const cards = await page.locator("#grid .card").count();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    const ok = cards > 0 && overflow <= 0;
+    // The header rail is the one part of the layout that changes shape with width rather
+    // than just size — a grid of labelled fields, folded to 2x2 below 480px. Overflow
+    // alone would not catch it collapsing, because a rail that has lost its columns
+    // simply gets taller. Field count varies legitimately (Balance appears only once a
+    // run has read the Firecrawl balance), so assert the arrangement, not the number.
+    const rail = await page.evaluate(() => {
+      const f = [...document.querySelectorAll("header .rail > div")];
+      const uniq = (xs) => new Set(xs).size;
+      return {
+        fields: f.length,
+        cols: uniq(f.map((e) => Math.round(e.getBoundingClientRect().left))),
+        rows: uniq(f.map((e) => Math.round(e.getBoundingClientRect().top))),
+      };
+    });
+    const phone = vp.width <= 480;
+    const railOk = rail.fields >= 3 && rail.rows === (phone ? 2 : 1) && rail.cols === (phone ? 2 : rail.fields);
+    const ok = cards > 0 && overflow <= 0 && railOk;
     if (!ok) failed = true;
-    console.log(`${name}: ${cards} cards, horizontal overflow = ${overflow}px ${ok ? "OK" : "FAIL"}`);
+    console.log(
+      `${name}: ${cards} cards, horizontal overflow = ${overflow}px, ` +
+        `rail ${rail.rows}x${rail.cols} of ${rail.fields} fields ${railOk ? "" : "(expected " + (phone ? "2 columns" : "one row") + ") "}` +
+        (ok ? "OK" : "FAIL"),
+    );
     await page.screenshot({ path: path.join(__dirname, `shot-${name}.png`), fullPage: false });
     await page.close();
   }

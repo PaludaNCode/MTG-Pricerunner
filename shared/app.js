@@ -28,7 +28,9 @@
       lastCm = cm;
       paint();
     } catch (e) {
-      $("updated").textContent = "load failed: " + e;
+      // Reported in the rail rather than beside it: a failure is a status, and the
+      // header has exactly one place for status now.
+      renderRail([{ k: "Status", v: "load failed: " + esc(String(e)), bad: true }]);
     }
   }
 
@@ -63,25 +65,66 @@
     // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
     window.__cmUpdatedAt = cm && cm.updatedAt;
 
-    $("updated").textContent =
-      (data.updatedAt ? "updated " + new Date(data.updatedAt).toLocaleString() : "starting…") +
-      " · " + totalOffers + " offers" +
-      cmSummary(cm);
+    paintStats(data, totalOffers, cm);
     renderLegend(cm);
     syncButton();
     syncPicks();
   }
 
-  // What the header says about Cardmarket. Deliberately NOT the age of cardmarket.json:
+  const esc = (v) =>
+    String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // The header's status rail. Built as data, not as a string, so a fact that does not
+  // exist yet is simply not emitted — "Balance" only appears once a run has read the
+  // Firecrawl balance — and so nothing can wrap into the middle of a clause.
+  function paintStats(data, totalOffers, cm) {
+    const at = data.updatedAt ? new Date(data.updatedAt) : null;
+    const now = new Date();
+    const sameDay = at && at.toDateString() === now.toDateString();
+    renderRail([
+      // The date is dropped on a same-day snapshot and kept otherwise; the tooltip
+      // always carries the full stamp. The stale form also loses its seconds, because
+      // the full locale string wraps the field to two lines at 320px — and a stale
+      // feed is exactly when the header must stay readable.
+      at
+        ? {
+            k: "Updated",
+            v: sameDay
+              ? at.toLocaleTimeString()
+              : at.toLocaleDateString() + " " + at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            t: at.toLocaleString(),
+          }
+        : { k: "Updated", v: "starting…" },
+      { k: "Offers", v: String(totalOffers) },
+      ...cmFields(cm),
+    ]);
+  }
+
+  // What the rail says about Cardmarket. Deliberately NOT the age of cardmarket.json:
   // that file is rewritten by every run even when the budget scraped nothing, so it
   // would read "0m" while every card on screen was days old. Credit spend is the honest
   // global number; per-card ages live on the cards themselves.
-  function cmSummary(cm) {
+  function cmFields(cm) {
     const m = cm && cm.meta;
-    if (!m) return " · CM never scraped";
-    if (m.allowance == null) return " · CM " + (m.scrapes || 0) + " scraped today";
-    return ` · CM ${m.credits || 0}/${Math.round(m.allowance)} credits today` +
-      (m.remaining != null ? ` (${m.remaining} left)` : "");
+    if (!m) return [{ k: "Cardmarket", v: "never scraped" }];
+    if (m.allowance == null) return [{ k: "CM scrapes", v: (m.scrapes || 0) + '<span class="q"> today</span>' }];
+    const fields = [{
+      k: "CM credits",
+      v: (m.credits || 0) + `<span class="q"> / ${Math.round(m.allowance)} today</span>`,
+      t: "credits spent today of the day's allowance",
+    }];
+    // The Firecrawl balance, when a run has read it. It is what decides whether the
+    // button can spend at all, so it earns a field of its own rather than a parenthesis.
+    if (m.remaining != null) fields.push({ k: "Balance", v: String(m.remaining), t: "Firecrawl credits left on the plan" });
+    return fields;
+  }
+
+  function renderRail(fields) {
+    const el = $("stats");
+    if (!el) return;
+    el.innerHTML = fields.map((f) =>
+      `<div><dt>${esc(f.k)}</dt><dd${f.bad ? ' class="bad"' : ""}${f.t ? ` title="${esc(f.t)}"` : ""}>${f.v}</dd></div>`,
+    ).join("");
   }
 
   // One line explaining the model, because "why is this card 3 days old?" and "what
