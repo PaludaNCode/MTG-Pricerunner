@@ -75,7 +75,7 @@
     String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   // The header's status rail. Built as data, not as a string, so a fact that does not
-  // exist yet is simply not emitted — "Balance" only appears once a run has read the
+  // exist yet is simply not emitted — "CM balance" only appears once a run has read the
   // Firecrawl balance — and so nothing can wrap into the middle of a clause.
   function paintStats(data, totalOffers, cm) {
     const at = data.updatedAt ? new Date(data.updatedAt) : null;
@@ -115,7 +115,9 @@
     }];
     // The Firecrawl balance, when a run has read it. It is what decides whether the
     // button can spend at all, so it earns a field of its own rather than a parenthesis.
-    if (m.remaining != null) fields.push({ k: "Balance", v: String(m.remaining), t: "Firecrawl credits left on the plan" });
+    // Named "CM balance" rather than "Balance": on a page with prices all over it, a
+    // lone "Balance" reads like money owed somewhere.
+    if (m.remaining != null) fields.push({ k: "CM balance", v: String(m.remaining), t: "Firecrawl credits left on the plan" });
     return fields;
   }
 

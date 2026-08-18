@@ -51,7 +51,7 @@ const server = http.createServer((req, res) => {
     // The header rail is the one part of the layout that changes shape with width rather
     // than just size — a grid of labelled fields, folded to 2x2 below 480px. Overflow
     // alone would not catch it collapsing, because a rail that has lost its columns
-    // simply gets taller. Field count varies legitimately (Balance appears only once a
+    // simply gets taller. Field count varies legitimately (CM balance appears only once a
     // run has read the Firecrawl balance), so assert the arrangement, not the number.
     const rail = await page.evaluate(() => {
       const f = [...document.querySelectorAll("header .rail > div")];
