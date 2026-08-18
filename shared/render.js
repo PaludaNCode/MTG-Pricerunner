@@ -47,6 +47,43 @@
   const MAX_VISIBLE_ROWS = 8;
   const expandedGroups = new Set();
 
+  // A Cardmarket row states its printing by name ("Zendikar Rising Extras"), and only
+  // its thumbnail states a code — so a row scraped before that extraction existed, or
+  // one with no thumbnail, has a name and nothing else. Rather than make the user spend
+  // credits re-scraping for a code, resolve it from the CardTrader printings of the same
+  // card, which are already on the page and carry config.json's curated Scryfall codes.
+  // Every rule below has to be evidence, not a guess: an unresolved name keeps showing
+  // the full name, which is only the status quo.
+  const normSet = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  function resolveCode(variant, ctPrintings, soleCmPrinting) {
+    const v = normSet(variant);
+    if (!v) return "";
+    const printings = ctPrintings.filter((p) => p.code);
+    // 1. The two sites agree on the name — nothing to infer.
+    const exact = printings.find((p) => normSet(p.variant) === v);
+    if (exact) return exact.code;
+    // 2. Cardmarket files promos as their own "<Set> Promos" expansion; Scryfall (and so
+    //    config.json) prefixes those codes with P. Without such a printing to point at,
+    //    give up rather than fall through and label a promo as the base set.
+    if (/\bpromos?\b/.test(v)) {
+      const promo = printings.find((p) => /^p/i.test(p.code));
+      return promo ? promo.code : "";
+    }
+    // 3. "<Set> Extras" is Cardmarket's split for showcase and extended-art printings,
+    //    which Scryfall keeps inside the base set.
+    const base = printings.find((p) => !/^p/i.test(p.code) && v.startsWith(normSet(p.variant) + " "));
+    if (base) return base.code;
+    // 4. When every CardTrader printing of this card is the same set, that is the set,
+    //    whatever either site calls it ("Secrets of Strixhaven" vs "Strixhaven"). Only
+    //    when Cardmarket is showing one printing too: otherwise a card watched on one
+    //    CardTrader printing would stamp that code onto every Cardmarket printing —
+    //    confidently wrong, which is worse than the full name it replaced.
+    if (!soleCmPrinting) return "";
+    const codes = [...new Set(printings.map((p) => p.code))];
+    return codes.length === 1 ? codes[0] : "";
+  }
+
   function shipCell(o) {
     if (o.shipsToMe === true) return '<span class="yes">✓</span>';
     if (o.shipsToMe === false) return '<span class="no">✗</span>';
@@ -110,6 +147,19 @@
       const distinct = new Set(ctPrintings.map((p) => `${p.variant}|${p.code}`));
       const solePrinting = distinct.size === 1 ? ctPrintings[0] : null;
 
+      // Resolved per card, and memoised: a card with 30 offers from 3 printings should
+      // run the rules three times, not thirty.
+      const cmNames = new Set();
+      for (const p of groups[g]) {
+        if (p.site !== "cardmarket") continue;
+        for (const o of p.offers || []) if (o.variant) cmNames.add(normSet(o.variant));
+      }
+      const resolved = new Map();
+      const codeFor = (variant) => {
+        if (!resolved.has(variant)) resolved.set(variant, resolveCode(variant, ctPrintings, cmNames.size === 1));
+        return resolved.get(variant);
+      };
+
       let merged = [];
       for (const p of groups[g]) {
         if (only && p.site !== only) continue;
@@ -121,7 +171,11 @@
           merged.push({
             ...o,
             _variant: o.variant || fallback.variant || "",
-            _code: o.code || (o.variant ? "" : fallback.code || ""),
+            // A curated code beats the scraped one when the row's printing is known:
+            // both sites abbreviate, and two spellings of one set in a single table
+            // reads as two different printings. Scraped is the next best thing, and the
+            // full name is what is left when neither knows.
+            _code: o.variant ? codeFor(o.variant) || o.code || "" : o.code || fallback.code || "",
             _site: p.site,
             _url: o.productUrl || p.productUrl,
           });

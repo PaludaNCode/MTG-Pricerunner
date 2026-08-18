@@ -295,6 +295,32 @@ function check(ok, msg) {
   check((await srcCount()) > 0, "Both brings the Src column back");
   await page.close();
 
+  console.log("a Cardmarket row with no scraped code borrows one from the CardTrader printings");
+  page = await open();
+  const cellFor = (card, title) =>
+    page.locator("#grid .card", { hasText: card }).locator(`td.c-set a[title="${title}"]`).first().textContent();
+
+  // The fixture leaves Runehorn's Cardmarket rows codeless, as everything scraped before
+  // the thumbnail extraction is. Nobody should have to spend a credit to get a code.
+  check(
+    (await cellFor("Runehorn Hellkite", "Commander 2016")) === "C16",
+    "the name CardTrader also uses resolves to its curated code",
+  );
+  check(
+    (await cellFor("Runehorn Hellkite", "Starter Commander Decks")) === "Starter Commander Decks",
+    "a name that matches nothing keeps the full name rather than guessing a code: " +
+      (await cellFor("Runehorn Hellkite", "Starter Commander Decks")),
+  );
+  check(
+    (await cellFor("Stock Up", "Aetherdrift")) === "DFT",
+    "a row that did carry a scraped code still shows it",
+  );
+  check(
+    (await page.locator("#grid .card", { hasText: "Runehorn Hellkite" }).locator("td.c-set a").first().getAttribute("title")).length > 3,
+    "the full set name survives as the link tooltip at every width",
+  );
+  await page.close();
+
   console.log("the strip is pinned on a desktop and scrolls away on a phone");
   // A short viewport is the point: the fixture grid is not tall enough to scroll at 900px.
   for (const [label, vp, pinned] of [

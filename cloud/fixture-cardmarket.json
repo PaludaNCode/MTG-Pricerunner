@@ -8,8 +8,8 @@
       "name": "Runehorn Hellkite", "productUrl": "https://example.com/cm/runehorn",
       "fetchedAt": "2026-01-01T08:40:00.000Z",
       "offers": [
-        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Commander 2016", "code": "C16", "productUrl": "https://example.com/cm/c16" },
-        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Starter Commander Decks", "code": "SCD", "productUrl": "https://example.com/cm/scd" }
+        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Commander 2016", "productUrl": "https://example.com/cm/c16" },
+        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Starter Commander Decks", "productUrl": "https://example.com/cm/scd" }
       ]
     },
     {
