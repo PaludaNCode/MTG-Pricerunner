@@ -8,8 +8,8 @@
       "name": "Runehorn Hellkite", "productUrl": "https://example.com/cm/runehorn",
       "fetchedAt": "2026-01-01T08:40:00.000Z",
       "offers": [
-        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Commander 2016", "productUrl": "https://example.com/cm/c16" },
-        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Starter Commander Decks", "productUrl": "https://example.com/cm/scd" }
+        { "price": 3.99, "priceStr": "3.99 €", "foil": false, "condition": "NM", "qty": 2, "seller": "CardmarketSeller", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Commander 2016", "code": "C16", "productUrl": "https://example.com/cm/c16" },
+        { "price": 12.5, "priceStr": "12.50 €", "foil": true, "condition": "EX", "qty": 1, "seller": "AnotherCMSellerName", "location": "Germany", "language": null, "shipsToMe": null, "variant": "Starter Commander Decks", "code": "SCD", "productUrl": "https://example.com/cm/scd" }
       ]
     },
     {
@@ -17,8 +17,8 @@
       "name": "Stock Up", "productUrl": "https://example.com/cm/stockup",
       "fetchedAt": "2026-01-01T07:10:00.000Z",
       "offers": [
-        { "price": 6.9, "priceStr": "6.90 €", "foil": false, "condition": "NM", "qty": 4, "seller": "TokyoCards", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Aetherdrift", "productUrl": "https://example.com/cm/dft" },
-        { "price": 24.0, "priceStr": "24.00 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ArchiveSeller", "location": "Italy", "language": null, "shipsToMe": null, "variant": "Mystical Archive", "productUrl": "https://example.com/cm/soa" }
+        { "price": 6.9, "priceStr": "6.90 €", "foil": false, "condition": "NM", "qty": 4, "seller": "TokyoCards", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Aetherdrift", "code": "DFT", "productUrl": "https://example.com/cm/dft" },
+        { "price": 24.0, "priceStr": "24.00 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ArchiveSeller", "location": "Italy", "language": null, "shipsToMe": null, "variant": "Mystical Archive", "code": "STA", "productUrl": "https://example.com/cm/soa" }
       ]
     },
     {
@@ -26,7 +26,7 @@
       "name": "Agadeem's Awakening", "productUrl": "https://example.com/cm/agadeem",
       "fetchedAt": "2025-12-30T22:00:00.000Z",
       "offers": [
-        { "price": 19.5, "priceStr": "19.50 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising", "productUrl": "https://example.com/cm/znr" }
+        { "price": 19.5, "priceStr": "19.50 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising", "code": "ZNR", "productUrl": "https://example.com/cm/znr" }
       ]
     }
   ]

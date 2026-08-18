@@ -222,3 +222,36 @@ test("a product link still wins over an expansion link on the same row", () => {
   assert.equal(offers[0].variant, "Zendikar");
   assert.match(offers[0].productUrl, /\/Magic\/Products\/Singles\/Zendikar\//);
 });
+
+// ---- Short set code -----------------------------------------------------------------
+// The Set column shows the full name on a desktop and the code on a phone. CardTrader
+// rows get their code from config.json; a Cardmarket all-versions row has no config
+// entry to take one from, so it comes out of the row's own thumbnail URL.
+const IMG = (code) =>
+  `<span data-bs-title="<img src=&quot;https://product-images.s3.cardmarket.com/1/${code}/293536/293536.jpg&quot;>"></span>`;
+const priced = (body) => `<a href="/en/Magic/Users/S">S</a><span class="fw-bold">1,00 €</span>` + body;
+
+test("an all-versions row takes its short set code from the thumbnail URL", () => {
+  const html = row(1, priced(IMG("C16") + `<a href="/en/Magic/Expansions/Commander-2016">C16</a>`));
+  const [o] = parseCardmarket(html);
+  assert.equal(o.variant, "Commander 2016", "the name still comes from the expansion link");
+  assert.equal(o.code, "C16");
+});
+
+test("a lowercase or missing image path degrades to the full name, never to junk", () => {
+  const lower = row(1, priced(IMG("fdn") + `<a href="/en/Magic/Expansions/Foundations">x</a>`));
+  assert.equal(parseCardmarket(lower)[0].code, "FDN", "codes are shown uppercase like CardTrader's");
+
+  const noImg = row(2, priced(`<a href="/en/Magic/Expansions/Foundations">x</a>`));
+  assert.equal(parseCardmarket(noImg)[0].code, null, "no thumbnail = no code, so render.js keeps the name");
+  assert.equal(parseCardmarket(noImg)[0].variant, "Foundations");
+});
+
+// A single-product page's rows name no printing — the entry does, and config.json's
+// Scryfall code is the curated answer there. Cardmarket's own abbreviation agrees with
+// Scryfall for most sets but not all, so it must not override it.
+test("a single-product row leaves code null so the config entry's code wins", () => {
+  const [o] = parseCardmarket(row(1, priced(IMG("PLST"))));
+  assert.equal(o.variant, null);
+  assert.equal(o.code, null);
+});
