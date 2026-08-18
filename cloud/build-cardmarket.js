@@ -5,8 +5,8 @@
 //
 // Deliberately separate from build-data.js (CardTrader) and published to its own
 // `data-cm` branch, because the two have nothing in common operationally:
-// CardTrader is a free API call every couple of minutes; Cardmarket is metered
-// scraping on an hourly cron. Sharing one file would also mean the 2-min job
+// CardTrader is a free API call every couple of minutes; Cardmarket is metered scraping,
+// started only on demand. Sharing one file would also mean the 2-min job
 // rewrites Cardmarket's budget ledger ~720 times a day — and a single dropped
 // --prev there is a credit-burn event. One writer, one file.
 //

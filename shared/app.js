@@ -1,8 +1,8 @@
 // Page bootstrap for the cloud static site.
 // The page sets window.DASH = { url, cmUrl?, intervalMs, showSrc? } before including
 // this script. `url` is the CardTrader feed (refreshed every couple of minutes) and
-// `cmUrl` the Cardmarket one (hourly at most, and often unchanged) — two files because
-// the two workflows publish independently to their own branches.
+// `cmUrl` the Cardmarket one (only ever refreshed on demand, so usually unchanged) — two
+// files because the two workflows publish independently to their own branches.
 // showSrc: false hides the Src column — useful if the data ever has a single source.
 (function () {
   const cfg = window.DASH || {};
@@ -160,7 +160,7 @@
   // Visitors without one can look but not spend.
   const TOKEN_KEY = "mtg-pricerunner.gh-token";
   // Which cards the next on-demand refresh should spend credits on. Empty = all of
-  // them, rotated stalest-first by the fetcher (the hourly cron's normal behaviour).
+  // them, rotated stalest-first by the fetcher.
   const PICKS_KEY = "mtg-pricerunner.cm-picks";
   const picks = new Set(loadPicks());
 
