@@ -34,6 +34,14 @@ const ROW_PRODUCT_LINK =
 const ROW_EXPANSION_LINK =
   /href=["'](?:https?:\/\/(?:www\.)?cardmarket\.com)?\/[a-z]{2}\/Magic\/Expansions\/([^/"'?#]+)(?=["'?#])/i;
 
+// The set as a CODE rather than a name. The row thumbnail is the only place the page
+// states one: the product image lives at
+//   product-images.s3.cardmarket.com/<n>/<SET>/<productId>/<productId>.jpg
+// and that <SET> is Cardmarket's abbreviation for the printing ("C16" in the captured
+// specimen). It sits inside an HTML-escaped tooltip attribute (src=&quot;…&quot;), so
+// match the URL itself rather than any quoting around it.
+const ROW_IMAGE_CODE = /product-images[a-z0-9.-]*\.cardmarket\.com\/\d+\/([A-Za-z0-9]{2,6})\/\d+/i;
+
 // Fallback: the expansion rendered as a symbol rather than a link. Only tags that
 // actually mention "expansion" are considered, so a "Foil" or seller tooltip can't be
 // mistaken for a set name.
@@ -56,7 +64,7 @@ const unslug = (s) => stripBrand(decodeURIComponent(s).replace(/-/g, " "));
 
 // Normalized offer shape (same contract as the CardTrader fetcher):
 // { price:Number|null, priceStr, foil:Bool|null, condition, qty, seller,
-//   location, language:String|null, shipsToMe:Bool|null, variant, productUrl }
+//   location, language:String|null, shipsToMe:Bool|null, variant, code, productUrl }
 // Where the offer list stops. The last row has no following row to bound it, so its
 // block would otherwise run to the end of the document and absorb the footer and
 // "related products" links — which is how one offer per card ended up labelled with a
@@ -110,6 +118,12 @@ function parseCardmarket(html) {
     const prodMatch = block.match(ROW_PRODUCT_LINK);
     const expMatch = prodMatch ? null : block.match(ROW_EXPANSION_LINK);
     const iconSet = prodMatch || expMatch ? null : expansionFromIcon(block);
+    // Only taken when the row named its own printing — i.e. on the all-versions page,
+    // where nothing else knows the set. On a single-product page the config entry's own
+    // Scryfall code is the curated answer and must not be overridden by Cardmarket's
+    // abbreviation, which agrees with Scryfall for most sets but not all.
+    const rowNamesSet = !!(prodMatch || expMatch || iconSet);
+    const codeMatch = rowNamesSet ? block.match(ROW_IMAGE_CODE) : null;
     if (price !== null || sellerMatch) {
       offers.push({
         price,
@@ -129,6 +143,8 @@ function parseCardmarket(html) {
             : iconSet
               ? stripBrand(iconSet)
               : null,
+        // Short set code for the phone layout, where the full name does not fit.
+        code: codeMatch ? codeMatch[1].toUpperCase() : null,
         productUrl: prodMatch ? "https://www.cardmarket.com" + prodMatch[1] : null,
       });
     }

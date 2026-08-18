@@ -45,3 +45,10 @@ test("the real all-versions row has no product link — the expansion link carri
 test("a real page is not mistaken for a Cloudflare interstitial", () => {
   assert.equal(looksBlocked(html), false);
 });
+
+// The same specimen also carries the set as a code, in the thumbnail's image URL —
+// which is what the phone layout shows in place of the full name.
+test("the captured row also yields the short set code", () => {
+  assert.match(html, /product-images\.s3\.cardmarket\.com\/1\/C16\//, "where the code lives");
+  assert.equal(parseCardmarket(html)[0].code, "C16");
+});
