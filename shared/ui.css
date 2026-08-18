@@ -5,6 +5,10 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { font-family: system-ui, "Segoe UI", sans-serif; margin: 0; padding: 0 1rem 2rem; background: var(--bg); color: var(--txt); }
+/* Header + control strip, pinned as one unit. Sticking the strip on its own would mean
+   knowing the header's height, which changes whenever the header wraps; sticking their
+   wrapper needs no number at all. Below 700px it reverts to a sticky header only. */
+.topbar { position: sticky; top: 0; z-index: 5; }
 header { position: sticky; top: 0; z-index: 5; margin: 0 -1rem 1rem; padding: .8rem 1.2rem;
   background: linear-gradient(120deg, #1b1740, #15233a 60%, #122b2b);
   border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
@@ -26,10 +30,12 @@ header h1 .sub { font-weight: 400; color: var(--muted); font-size: .8rem; margin
 /* Control strip. Sits directly under the header — the negative top margin cancels the
    header's bottom margin so the two read as one band — and holds both things that
    decide what a refresh does: the source filter (free, client-side) on the left and
-   the selection plus ↻ CM (spends credits) on the right. */
+   the selection plus ↻ CM (spends credits) on the right. The background is the opaque
+   equivalent of rgba(0,0,0,.22) over --bg — identical to look at, but a translucent
+   strip would let the grid show through it once pinned. */
 .controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
   margin: -1rem -1rem .9rem; padding: .5rem 1.2rem;
-  background: rgba(0,0,0,.22); border-bottom: 1px solid var(--line); }
+  background: #0b0c11; border-bottom: 1px solid var(--line); }
 .ctl-group { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 /* Needed because the class above would otherwise beat the UA rule for [hidden] —
    app.js hides this whole half when no refresh target is configured. */
@@ -137,6 +143,11 @@ tr.row-toggle button:hover { color: var(--txt); background: var(--card2); }
 }
 @media (max-width: 700px) {
   #grid { grid-template-columns: minmax(0, 1fr); }
+  /* Phones keep a sticky header but let the strip scroll away — pinned, the pair costs
+     too much of a small screen. `display: contents` rather than `position: static`:
+     a sticky element can only travel inside its parent's box, so a wrapper that still
+     generates one would drag the header off the top with it. */
+  .topbar { display: contents; }
 }
 @media (max-width: 480px) {
   body { padding: 0 .55rem 1.5rem; }

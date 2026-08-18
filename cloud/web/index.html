@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="ui.css" />
 </head>
 <body>
+<!-- Header and control strip travel together: on a desktop the pair is pinned to the
+     top (see .topbar in ui.css), so the source filter and the selection are reachable
+     without scrolling back up. Wrapping them is what makes that a two-line CSS change —
+     the strip alone would need the header's height, which changes as the header wraps. -->
+<div class="topbar">
 <header>
   <h1>🃏 JP Card Watcher <span class="sub">CardTrader · Cardmarket · Japanese</span></h1>
   <span class="live"><span class="dot"></span>live</span>
@@ -37,6 +42,7 @@
     <button id="cm-token-toggle" class="refresh key" type="button" title="Set or clear the GitHub token">⚿</button>
     <button id="cm-refresh" class="refresh" type="button" title="Scrape Cardmarket now">↻ CM</button>
   </span>
+</div>
 </div>
 <div id="legend" class="legend"></div>
 <div id="notice" class="notice" hidden></div>
