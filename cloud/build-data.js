@@ -3,7 +3,7 @@
 //
 //   CARDTRADER_TOKEN=…  node cloud/build-data.js
 //
-// CardTrader only. Cardmarket is metered scraping on a separate hourly schedule and
+// CardTrader only. Cardmarket is metered scraping, run only on demand, and it
 // lives in its own file on its own branch — see cloud/build-cardmarket.js. Keeping
 // this job free of it is deliberate: it runs every couple of minutes and must stay
 // stateless, with nothing to carry forward and nothing expensive to lose.
