@@ -6,7 +6,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
+const { launchChromium } = require("./launch-browser");
 
 const WEB = path.join(__dirname, "web");
 const SHARED = path.join(__dirname, "..", "shared");
@@ -40,7 +40,7 @@ const server = http.createServer((req, res) => {
 (async () => {
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   let failed = false;
   for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["narrow", { width: 320, height: 700 }], ["desktop", { width: 1440, height: 900 }]]) {
     const page = await browser.newPage({ viewport: vp });

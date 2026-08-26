@@ -9,7 +9,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
+const { launchChromium } = require("./launch-browser");
 
 const WEB = path.join(__dirname, "web");
 const SHARED = path.join(__dirname, "..", "shared");
@@ -51,7 +51,7 @@ function check(ok, msg) {
 (async () => {
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
 
   const open = async (init) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
