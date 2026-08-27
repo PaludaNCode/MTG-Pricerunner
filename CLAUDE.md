@@ -52,7 +52,7 @@ node cloud/verify-set-codes.js
 for f in $(git ls-files '*.js'); do node --check "$f"; done
 ```
 
-No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + unit tests + both browser checks above.
+No build step. CI (`.github/workflows/ci.yml`, job `checks`) = syntax check + unit tests + the Scryfall set-code check + both browser checks above.
 
 ## Workflow rules (non-negotiable)
 

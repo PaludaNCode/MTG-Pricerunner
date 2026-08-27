@@ -161,6 +161,16 @@ allowance sooner; it can never overspend the plan. When the allowance is gone th
 greys itself out and says so, rather than firing a run that would defer every card. Tick
 the cards you want first; ticking nothing scrapes every card, stalest first.
 
+**Nothing scrapes between 00:00 and 08:00 UTC.** There is no scheduler to switch off —
+only a human ever starts a run — so the window guards the on-demand path instead: a press
+at 03:00 would spend credits nobody is awake to read. A run started inside it scrapes
+nothing and writes nothing, and the button greys out with the reason. `force` does not
+bypass it, for the same reason force does not bypass the credit allowance — "I want this
+now" may reorder the day's spending, not rewrite the rules. The free balance check still
+works. UTC because the ledger day rolls at 00:00 UTC and the allowance unlocks with it,
+so the window opens exactly when the fresh allowance does. Set `cardmarketQuietStartHour`
+equal to `cardmarketQuietEndHour` in `config.json` to switch it off.
+
 Triggering a workflow needs a GitHub PAT with `Actions: read and write`, and this site
 is public — so the token is **not** in the page. The strip has a token field: paste the
 PAT, press Enter, and it is kept in that browser's `localStorage`. The field then hides
@@ -222,7 +232,11 @@ its fixture otherwise, so the check never touches the network.
 
 Add an entry to `cards` in `config.json` (CardTrader **or** Cardmarket URL +
 `group` + `variant` + `code`, the official Scryfall set code the Set column shows —
-CI fails if it's missing), and merge to `main` via PR. That push triggers an immediate
+CI fails if it's missing, **and now also if it's wrong**: `cloud/verify-set-codes.js`
+runs on the Actions runner, where the network is open, and rejects a code that names no
+Scryfall set or names a real set that doesn't contain the card. When it fails it prints
+the sets the card actually is in, so the fix is in the log. It degrades to a warning if
+Scryfall doesn't answer, so it can't become a flaky gate), and merge to `main` via PR. That push triggers an immediate
 CardTrader refresh; Cardmarket only moves when someone presses ↻ CM.
 
 Entries sharing a `group` are merged into one card on the page, so pasting both a
