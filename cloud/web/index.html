@@ -59,8 +59,9 @@
 <div id="grid"></div>
 
 <!-- Two feeds, two branches, two cadences: `data` holds CardTrader (update-data.yml, every
-     couple of minutes) and `data-cm` holds Cardmarket (update-cardmarket.yml, hourly at most —
-     it is metered scraping). Both are served from raw.githubusercontent.com, whose Fastly CDN
+     couple of minutes) and `data-cm` holds Cardmarket (update-cardmarket.yml, on demand only —
+     it is metered scraping, so nothing but a human starts a run, and none at all between
+     00:00 and 08:00 UTC). Both are served from raw.githubusercontent.com, whose Fastly CDN
      caches max-age=300, so staleness is bounded to ~5 min and self-heals every cycle.
      We deliberately do NOT use jsDelivr here: it caches @branch refs for ~12h and its purge API
      is rate-limited, so purging every run gets throttled and the site sticks on a stale snapshot.
