@@ -1,35 +1,38 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { auditCodes } = require("../cloud/verify-set-codes");
+const http = require("node:http");
+const { auditCodes, liveApi } = require("../cloud/verify-set-codes");
 
 // The check runs in CI against the live API, but its decision table has to be provable
 // offline — the environment that most needs the guard is the one that can't reach
 // Scryfall. So the api object is faked here, exhaustively.
-function fakeApi({ sets, cards = {}, setsDown = false, cardsDown = false }) {
+function fakeApi({ sets, cards = {}, printings = {}, setsDown = false, cardsDown = false, printingsDown = false }) {
   return {
     async listSets() {
       if (setsDown) return { reachable: false, why: "ENOTFOUND" };
       return { reachable: true, codes: new Map(Object.entries(sets)) };
     },
-    async cardInSet(name, code) {
+    async lookupCards(pairs) {
       if (cardsDown) return { reachable: false, why: "HTTP 429" };
-      return { reachable: true, found: !!cards[`${name}|${code}`] };
+      return { reachable: true, notFound: pairs.filter((p) => !cards[`${p.group}|${p.code}`]) };
+    },
+    async printingsOf(name) {
+      if (printingsDown) return { reachable: false, why: "HTTP 500" };
+      return { reachable: true, codes: printings[name] || [] };
     },
   };
 }
 
-const NO_THROTTLE = { throttleMs: 0 };
-
 test("a real code holding the card passes", async () => {
   const api = fakeApi({ sets: { HOB: "The Hobbit" }, cards: { "Giant's Boulder|HOB": true } });
-  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api);
   assert.deepEqual(r.errors, []);
   assert.equal(r.checked, 1);
 });
 
 test("a code that names no Scryfall set fails", async () => {
   const api = fakeApi({ sets: { HOB: "The Hobbit" } });
-  const r = await auditCodes([{ group: "Giant's Boulder", code: "ZZZ" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "ZZZ" }], api);
   assert.equal(r.errors.length, 1);
   assert.match(r.errors[0], /not a Scryfall set code/);
 });
@@ -40,65 +43,100 @@ test("a real set that doesn't contain the card fails", async () => {
     sets: { HOB: "The Hobbit", HOC: "The Hobbit Commander" },
     cards: { "Giant's Boulder|HOB": true },
   });
-  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOC" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOC" }], api);
   assert.equal(r.errors.length, 1);
-  assert.match(r.errors[0], /no card by that name in HOC/);
+  assert.match(r.errors[0], /not in HOC \(The Hobbit Commander\)/);
+});
+
+// Whoever has to fix a bad code may be in a session that can't reach Scryfall, so the
+// error has to carry the answer rather than just the verdict.
+test("a failure names the sets the card is actually in", async () => {
+  const api = fakeApi({
+    sets: { HOB: "The Hobbit", HOC: "The Hobbit Commander" },
+    cards: { "Giant's Boulder|HOB": true },
+    printings: { "Giant's Boulder": ["HOB"] },
+  });
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOC" }], api);
+  assert.match(r.errors[0], /Scryfall lists it in: HOB/);
+});
+
+test("a card name Scryfall has never heard of says so, instead of blaming the code", async () => {
+  const api = fakeApi({ sets: { TMT: "Teenage Mutant Ninja Turtles" }, printings: {} });
+  const r = await auditCodes([{ group: "Sewer Veillance Cam", code: "TMT" }], api);
+  assert.match(r.errors[0], /no card named "Sewer Veillance Cam"; check the name/);
+});
+
+test("an unknown code still gets a suggestion", async () => {
+  const api = fakeApi({
+    sets: { MSH: "Marvel Super Heroes" },
+    printings: { "Shuri, Wakandan Inventor": ["MSH", "PMSC"] },
+  });
+  const r = await auditCodes([{ group: "Shuri, Wakandan Inventor", code: "PMSH" }], api);
+  assert.match(r.errors[0], /not a Scryfall set code/);
+  assert.match(r.errors[0], /Scryfall lists it in: MSH, PMSC/);
 });
 
 test("codes are matched case-insensitively", async () => {
   const api = fakeApi({ sets: { ZEN: "Zendikar" }, cards: { "Arid Mesa|ZEN": true } });
-  const r = await auditCodes([{ group: "Arid Mesa", code: "zen" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Arid Mesa", code: "zen" }], api);
   assert.deepEqual(r.errors, []);
 });
 
 // allVersions entries span every printing and carry no single set, by design.
 test("entries without a code are skipped, not failed", async () => {
   const api = fakeApi({ sets: {} });
-  const r = await auditCodes([{ group: "Planar Nexus", code: null }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Planar Nexus", code: null }], api);
   assert.deepEqual(r.errors, []);
   assert.equal(r.checked, 0);
 });
 
-test("one card watched on both sites is only queried once", async () => {
-  let calls = 0;
+test("one card watched on both sites is only looked up once", async () => {
+  let asked = 0;
   const api = {
     async listSets() {
       return { reachable: true, codes: new Map([["ZEN", "Zendikar"]]) };
     },
-    async cardInSet() {
-      calls++;
-      return { reachable: true, found: true };
+    async lookupCards(pairs) {
+      asked = pairs.length;
+      return { reachable: true, notFound: [] };
+    },
+    async printingsOf() {
+      return { reachable: true, codes: [] };
     },
   };
-  const entries = [
-    { group: "Arid Mesa", code: "ZEN" },
-    { group: "Arid Mesa", code: "ZEN" },
-  ];
-  const r = await auditCodes(entries, api, NO_THROTTLE);
-  assert.equal(calls, 1);
+  const r = await auditCodes(
+    [
+      { group: "Arid Mesa", code: "ZEN" },
+      { group: "Arid Mesa", code: "ZEN" },
+    ],
+    api,
+  );
+  assert.equal(asked, 1);
   assert.equal(r.checked, 1);
 });
 
 // Never a flaky gate: no answer from Scryfall must not read as a bad config.
 test("an unreachable Scryfall skips everything instead of failing", async () => {
   const api = fakeApi({ sets: {}, setsDown: true });
-  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api);
   assert.deepEqual(r.errors, []);
   assert.equal(r.checked, 0);
   assert.match(r.skipped[0], /unreachable/);
 });
 
-test("a rate-limited card query is skipped, not failed", async () => {
+// The rate-limit storm that made the first version useless: it must degrade to a skip,
+// never to a wall of false failures.
+test("a rate-limited card lookup is skipped, not failed", async () => {
   const api = fakeApi({ sets: { HOB: "The Hobbit" }, cardsDown: true });
-  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api, NO_THROTTLE);
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "HOB" }], api);
   assert.deepEqual(r.errors, []);
   assert.equal(r.skipped.length, 1);
   assert.match(r.skipped[0], /429/);
 });
 
-// A bad code must still be caught when the set list came through, even if a later
-// card query dies — the two failures are independent.
-test("a nonexistent code fails even while other queries are being skipped", async () => {
+// A bad code must still be caught when the set list came through, even if the bulk
+// lookup dies afterwards — the two failures are independent.
+test("a nonexistent code fails even while the card lookup is being skipped", async () => {
   const api = fakeApi({ sets: { HOB: "The Hobbit" }, cardsDown: true });
   const r = await auditCodes(
     [
@@ -106,11 +144,17 @@ test("a nonexistent code fails even while other queries are being skipped", asyn
       { group: "Made Up Card", code: "ZZZ" },
     ],
     api,
-    NO_THROTTLE,
   );
   assert.equal(r.errors.length, 1);
   assert.match(r.errors[0], /not a Scryfall set code/);
   assert.equal(r.skipped.length, 1);
+});
+
+test("a failing suggestion lookup still leaves a usable error", async () => {
+  const api = fakeApi({ sets: { HOB: "The Hobbit" }, printingsDown: true });
+  const r = await auditCodes([{ group: "Giant's Boulder", code: "ZZZ" }], api);
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /not a Scryfall set code$/);
 });
 
 test("every bad code is reported, not just the first", async () => {
@@ -121,7 +165,6 @@ test("every bad code is reported, not just the first", async () => {
       { group: "B", code: "YYY" },
     ],
     api,
-    NO_THROTTLE,
   );
   assert.equal(r.errors.length, 2);
 });
@@ -132,12 +175,8 @@ test("every bad code is reported, not just the first", async () => {
 // "Scryfall has no sets" would fail every code in config.json at once — so the empty
 // payload has to count as no answer. Only builtins here: `npm test` runs before
 // `npm ci` and must stay dep-free.
-const http = require("node:http");
-const { liveApi } = require("../cloud/verify-set-codes");
-
 const SETS = { data: [{ code: "hob", name: "The Hobbit" }, { code: "zen", name: "Zendikar" }] };
 
-// Routes are chosen per-request by the mode the test sets, so one server covers all.
 function withServer(mode, fn) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -148,9 +187,20 @@ function withServer(mode, fn) {
       };
       if (mode === "down") return res.writeHead(503).end("{}");
       if (u.pathname === "/sets") return json(200, mode === "emptySets" ? {} : SETS);
+      if (u.pathname === "/cards/collection") {
+        let raw = "";
+        req.on("data", (c) => (raw += c));
+        return req.on("end", () => {
+          const ids = JSON.parse(raw).identifiers || [];
+          json(200, {
+            data: ids.filter((i) => i.set === "hob"),
+            not_found: ids.filter((i) => i.set !== "hob"),
+          });
+        });
+      }
       if (u.pathname === "/cards/search") {
         const q = u.searchParams.get("q") || "";
-        if (/set:HOB/.test(q) && /Giant's Boulder/.test(q)) return json(200, { total_cards: 1 });
+        if (/Giant's Boulder/.test(q)) return json(200, { data: [{ set: "hob" }, { set: "hob" }] });
         return json(404, { object: "error", code: "not_found" });
       }
       return json(404, {});
@@ -190,20 +240,42 @@ test("live: a 5xx is unreachable rather than an answer", async () => {
   assert.match(r.why, /503/);
 });
 
-test("live: a card present in the set is found", async () => {
-  const r = await withServer("ok", () => liveApi.cardInSet("Giant's Boulder", "HOB"));
-  assert.deepEqual(r, { reachable: true, found: true });
+// The whole point of the rewrite: one POST covers the config, so there is no per-card
+// request to be rate-limited.
+test("live: the whole config goes out as a single collection POST", async () => {
+  const r = await withServer("ok", () =>
+    liveApi.lookupCards([
+      { group: "Giant's Boulder", code: "HOB" },
+      { group: "Arid Mesa", code: "ZEN" },
+    ]),
+  );
+  assert.equal(r.reachable, true);
+  assert.deepEqual(r.notFound, [{ group: "Arid Mesa", code: "ZEN" }]);
 });
 
-test("live: Scryfall's 404-for-no-results reads as 'not in that set', not as an outage", async () => {
-  const r = await withServer("ok", () => liveApi.cardInSet("Giant's Boulder", "ZEN"));
-  assert.deepEqual(r, { reachable: true, found: false });
+test("live: printingsOf dedupes the set codes it reports", async () => {
+  const r = await withServer("ok", () => liveApi.printingsOf("Giant's Boulder"));
+  assert.deepEqual(r, { reachable: true, codes: ["HOB"] });
+});
+
+test("live: a name Scryfall 404s on comes back as no printings, not as an outage", async () => {
+  const r = await withServer("ok", () => liveApi.printingsOf("Nonexistent Card"));
+  assert.deepEqual(r, { reachable: true, codes: [] });
 });
 
 test("live: an audit against a dead Scryfall skips instead of failing", async () => {
   const r = await withServer("down", () =>
-    auditCodes([{ group: "Giant's Boulder", code: "HOB" }], liveApi, { throttleMs: 0 }),
+    auditCodes([{ group: "Giant's Boulder", code: "HOB" }], liveApi),
   );
   assert.deepEqual(r.errors, []);
   assert.equal(r.checked, 0);
+});
+
+test("live: a full audit through real HTTP catches the wrong set and names the right one", async () => {
+  const r = await withServer("ok", () =>
+    auditCodes([{ group: "Giant's Boulder", code: "ZEN" }], liveApi),
+  );
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /not in ZEN \(Zendikar\)/);
+  assert.match(r.errors[0], /Scryfall lists it in: HOB/);
 });
