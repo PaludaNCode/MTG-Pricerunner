@@ -13,7 +13,9 @@
 // checks assert; a check that cannot run at all is not.
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
+// playwright is required lazily, inside launchChromium(): CI runs `npm test` before
+// `npm ci` because the unit tests are zero-dep, and a top-level require here would drag
+// playwright into that step and fail it.
 
 function isExecutableFile(p) {
   try {
@@ -58,6 +60,7 @@ function installedChromium() {
 }
 
 async function launchChromium(opts = {}) {
+  const { chromium } = require("playwright");
   try {
     return await chromium.launch(opts);
   } catch (err) {
