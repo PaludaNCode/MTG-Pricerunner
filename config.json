@@ -45,6 +45,7 @@
     { "url": "https://www.cardtrader.com/en/cards/27073-windswept-heath-onslaught", "group": "Windswept Heath", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/27071-wooded-foothills-onslaught", "group": "Wooded Foothills", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/27088-bloodstained-mire-onslaught", "group": "Bloodstained Mire", "variant": "Onslaught", "code": "ONS" },
+    { "url": "https://www.cardtrader.com/en/cards/401367-giant-s-boulder-the-hobbit", "group": "Giant's Boulder", "variant": "The Hobbit", "code": "HOB" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Agadeems-Awakening-Agadeem-the-Undercrypt?language=7", "group": "Agadeem's Awakening", "variant": "All printings", "allVersions": true },
