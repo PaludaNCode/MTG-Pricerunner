@@ -21,6 +21,12 @@ jobs:
           for f in $(git ls-files '*.js'); do node --check "$f"; done
       - name: Unit tests
         run: npm test
+      # Runs here and not in `npm test` because it needs the network: a Claude Code web
+      # session (and any offline dev box) can't reach api.scryfall.com, and a config
+      # guard that only works on the runner still catches a wrong code before it ships.
+      # It degrades to a warning when Scryfall doesn't answer, so it can't gate on flake.
+      - name: Validate set codes against Scryfall
+        run: node cloud/verify-set-codes.js
       - name: Install dependencies
         run: npm ci
       - name: Install Playwright Chromium
