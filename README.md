@@ -192,6 +192,8 @@ Trunk-based, short-lived branches:
 
 `main` is protected: PRs need the `checks` job green before merge; force-pushes and
 deletion are blocked. Repo admins can push directly in a pinch (escape hatch — prefer PRs).
+Merged PRs clean up after themselves — "Automatically delete head branches" is on, so
+GitHub removes the head branch at merge and nothing needs pruning by hand.
 
 ## Maintenance
 
