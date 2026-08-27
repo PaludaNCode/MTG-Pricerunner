@@ -1,5 +1,6 @@
 // Page bootstrap for the cloud static site.
-// The page sets window.DASH = { url, cmUrl?, intervalMs, showSrc? } before including
+// The page sets window.DASH = { url, cmUrl?, intervalMs, showSrc?, quietStartHour?,
+// quietEndHour? } before including
 // this script. `url` is the CardTrader feed (refreshed every couple of minutes) and
 // `cmUrl` the Cardmarket one (only ever refreshed on demand, so usually unchanged) — two
 // files because the two workflows publish independently to their own branches.
@@ -27,6 +28,25 @@
   // must never be combined with a spend from another day. `stale` carries the fact
   // onwards for the wording; a ledger with no `day` at all is left alone.
   const utcDay = (t) => new Date(t).toISOString().slice(0, 10);
+
+  // The overnight quiet window, mirroring inQuietHours() in cloud/fetch-cardmarket.js —
+  // the workflow is the enforcement, this is only the explanation. Duplicated rather
+  // than shared because a fifth page script would break the deploy workflow's
+  // four-asset cache-bust stamp (see test/deploy-stamp.test.js); if you change the hours
+  // in config.json, change them here too.
+  // Overridable through window.DASH so the browser checks can pin the window instead of
+  // depending on what time CI happens to run — without that, every existing assertion
+  // about an armed button would fail between 00:00 and 08:00 UTC.
+  const QUIET_START_HOUR = cfg.quietStartHour != null ? cfg.quietStartHour : 0;
+  const QUIET_END_HOUR = cfg.quietEndHour != null ? cfg.quietEndHour : 8;
+  function inQuietHours(now) {
+    if (QUIET_START_HOUR === QUIET_END_HOUR) return false;
+    const hour = new Date(now == null ? Date.now() : now).getUTCHours();
+    return QUIET_START_HOUR < QUIET_END_HOUR
+      ? hour >= QUIET_START_HOUR && hour < QUIET_END_HOUR
+      : hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+  }
+  const hh = (h) => String(h).padStart(2, "0") + ":00";
   function dayLedger(meta, now) {
     if (!meta) return null;
     if (!meta.day || meta.day === utcDay(now == null ? Date.now() : now)) return { ...meta, stale: false };
@@ -364,6 +384,16 @@
     if (!btn || polling) return;
     const label = picks.size ? `↻ CM (${picks.size})` : "↻ CM";
     if (!getToken()) return setBtn(label, true, "Enter a GitHub token (⚿) to refresh on demand");
+    // Ahead of the budget check: inside the window the workflow scrapes nothing whatever
+    // the budget says, so offering the button would spend a dispatch on a no-op run.
+    if (inQuietHours()) {
+      return setBtn(
+        "CM quiet hours",
+        true,
+        `Cardmarket refreshes are off between ${hh(QUIET_START_HOUR)} and ${hh(QUIET_END_HOUR)} UTC` +
+          ` — a run started now would scrape nothing. The free balance check still works.`,
+      );
+    }
     const b = budgetState(lastMeta);
     const scope = picks.size
       ? `Scrape the ${picks.size} ticked card(s)`

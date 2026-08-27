@@ -60,8 +60,30 @@ function check(ok, msg) {
   const port = server.address().port;
   const browser = await launchChromium();
 
-  const open = async (init) => {
+  // Every page opens with the quiet window switched off unless a case asks for one.
+  // Without this the whole suite would depend on what time CI runs: from 00:00 to 08:00
+  // UTC the button is deliberately disabled, and every assertion below about an armed
+  // button would fail — a check that only passes in office hours is worse than none.
+  // `init` keeps its original contract (a script string or function run before load).
+  // `quiet` pins the Cardmarket quiet window, defaulting to off.
+  const open = async (init, quiet) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    // The page assigns window.DASH inline and app.js reads it; intercept the assignment
+    // so the hours are already pinned by the time the reader sees the object.
+    await page.addInitScript(([startHour, endHour]) => {
+      let held;
+      Object.defineProperty(window, "DASH", {
+        configurable: true,
+        get: () => held,
+        set: (v) => {
+          held = v;
+          if (held) {
+            held.quietStartHour = startHour;
+            held.quietEndHour = endHour;
+          }
+        },
+      });
+    }, quiet || [0, 0]);
     if (init) await page.addInitScript(init);
     await page.goto(`http://localhost:${port}/`);
     await page.waitForSelector("#grid .card");
@@ -455,6 +477,43 @@ function check(ok, msg) {
   check(
     (await page.locator("#notice").textContent()).includes("Actions: read and write"),
     "the 401 notice says what the token actually needs",
+  );
+  await page.close();
+
+  // Cardmarket has no scheduler, so the quiet window is a guard on the on-demand path.
+  // The workflow is the real enforcement (a run started inside the window scrapes
+  // nothing); the button's job is to say so rather than spend a dispatch on a no-op.
+  // The window is pinned to cover every hour, so this case is independent of the clock.
+  console.log("inside the quiet window the button explains itself instead of firing");
+  page = await open(
+    `localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`,
+    [0, 24],
+  );
+  check(await page.locator("#cm-refresh").isDisabled(), "button is disabled during quiet hours");
+  check(
+    (await page.locator("#cm-refresh").textContent()).includes("quiet hours"),
+    "and says why, rather than looking broken",
+  );
+  const quietTitle = (await page.getAttribute("#cm-refresh", "title")).toLowerCase();
+  check(quietTitle.includes("utc"), "the tooltip names the window in UTC");
+  check(quietTitle.includes("balance"), "and points at the free balance check, which still works");
+  // No "nothing was dispatched" assertion here: a disabled button emits no click, so it
+  // could never fail and would only look like coverage. The disabled state above is the
+  // guarantee, and the workflow-side refusal — the one that actually protects credits —
+  // is pinned by test/quiet-hours.test.js.
+  await page.close();
+
+  // The other side of the same switch: outside the window the button is armed as before.
+  // Both halves matter — a guard stuck on would be as broken as one stuck off.
+  console.log("outside the window the button is armed as usual");
+  page = await open(
+    `localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`,
+    [0, 0],
+  );
+  check(!(await page.locator("#cm-refresh").isDisabled()), "button is armed outside quiet hours");
+  check(
+    !(await page.locator("#cm-refresh").textContent()).includes("quiet"),
+    "and says nothing about quiet hours",
   );
   await page.close();
 
