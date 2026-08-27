@@ -47,7 +47,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ask(url, init = {}, { retries = 1 } = {}) {
   let res;
   try {
-    res = await fetch(url, { ...init, headers: HEADERS, signal: AbortSignal.timeout(20000) });
+    res = await fetch(url, {
+      ...init,
+      headers: init.headers || HEADERS,
+      signal: AbortSignal.timeout(20000),
+    });
   } catch (err) {
     return { reachable: false, why: err.name === "TimeoutError" ? "timed out" : err.message };
   }
@@ -67,7 +71,14 @@ async function ask(url, init = {}, { retries = 1 } = {}) {
   return { reachable: true, status: res.status, body };
 }
 
-const postJson = (url, payload) => ask(url, { method: "POST", body: JSON.stringify(payload) });
+// Content-Type is required: without it Scryfall rejects the POST, and the rejection is
+// still valid JSON — which is how a version of this shipped "verifying" nothing at all.
+const postJson = (url, payload) =>
+  ask(url, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: { ...HEADERS, "Content-Type": "application/json" },
+  });
 
 const liveApi = {
   async listSets() {
@@ -91,7 +102,19 @@ const liveApi = {
         identifiers: slice.map((p) => ({ name: p.group, set: String(p.code).toLowerCase() })),
       });
       if (!r.reachable) return r;
-      for (const id of r.body?.not_found || []) {
+      // A rejected POST answers with a perfectly valid JSON error object, and reading
+      // its absent not_found as "nothing missing" turns a broken check into a green
+      // one. Demand the shape a real answer has: both arrays present, and one entry
+      // accounted for per identifier sent.
+      const data = r.body?.data;
+      const missing = r.body?.not_found;
+      if (!Array.isArray(data) || !Array.isArray(missing) || data.length + missing.length !== slice.length) {
+        return {
+          reachable: false,
+          why: `unexpected /cards/collection payload (HTTP ${r.status}${r.body?.details ? `: ${r.body.details}` : ""})`,
+        };
+      }
+      for (const id of missing) {
         notFound.push({ group: id.name, code: String(id.set || "").toUpperCase() });
       }
     }

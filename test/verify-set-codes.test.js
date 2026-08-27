@@ -188,6 +188,13 @@ function withServer(mode, fn) {
       if (mode === "down") return res.writeHead(503).end("{}");
       if (u.pathname === "/sets") return json(200, mode === "emptySets" ? {} : SETS);
       if (u.pathname === "/cards/collection") {
+        // Scryfall rejects a POST with no Content-Type, and the rejection is valid
+        // JSON — the exact response that once made this check pass while verifying
+        // nothing. The stub reproduces it rather than being generous.
+        if (!/application\/json/.test(req.headers["content-type"] || "")) {
+          return json(415, { object: "error", code: "unsupported_media_type", details: "Content-Type must be application/json" });
+        }
+        if (mode === "badCollection") return json(200, { object: "list", data: [] });
         let raw = "";
         req.on("data", (c) => (raw += c));
         return req.on("end", () => {
@@ -278,4 +285,33 @@ test("live: a full audit through real HTTP catches the wrong set and names the r
   assert.equal(r.errors.length, 1);
   assert.match(r.errors[0], /not in ZEN \(Zendikar\)/);
   assert.match(r.errors[0], /Scryfall lists it in: HOB/);
+});
+
+// The defect that shipped: the POST went out without a Content-Type, Scryfall rejected
+// it, the rejection parsed as JSON, and an absent not_found read as "nothing missing" —
+// so the check reported every code verified while checking none of them. Two guards, so
+// neither the cause nor the class can come back.
+test("live: the collection POST declares application/json", async () => {
+  const r = await withServer("ok", () =>
+    liveApi.lookupCards([{ group: "Giant's Boulder", code: "HOB" }]),
+  );
+  assert.equal(r.reachable, true, "a POST without Content-Type is rejected by Scryfall");
+  assert.deepEqual(r.notFound, []);
+});
+
+test("live: a collection reply that accounts for nothing is no answer, not a pass", async () => {
+  const r = await withServer("badCollection", () =>
+    liveApi.lookupCards([{ group: "Giant's Boulder", code: "ZEN" }]),
+  );
+  assert.equal(r.reachable, false, "an unshaped reply must never read as 'nothing missing'");
+  assert.match(r.why, /unexpected \/cards\/collection payload/);
+});
+
+test("live: an audit over a mis-shaped collection reply skips instead of passing", async () => {
+  const r = await withServer("badCollection", () =>
+    auditCodes([{ group: "Giant's Boulder", code: "ZEN" }], liveApi),
+  );
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.checked, 0, "nothing may be reported as checked when nothing was");
+  assert.match(r.skipped[0], /not confirmed/);
 });
