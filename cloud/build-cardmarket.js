@@ -158,6 +158,29 @@ async function main() {
     return;
   }
 
+  // The overnight quiet window. This sits AFTER the balance-only path on purpose:
+  // reading the balance is not billed, so there is nothing to be quiet about, and the
+  // page's free "check credit balance" link has to keep working at 03:00.
+  //
+  // It also sits ahead of CM_FORCE, and force does NOT bypass it — for the same reason
+  // force does not bypass the credit allowance. "I want this now" may reorder the day's
+  // spending; it may not decide the rules. Set cardmarketQuietStartHour and
+  // cardmarketQuietEndHour equal in config.json to switch the window off entirely.
+  //
+  // A skip writes nothing at all. The alternative — republishing an unchanged
+  // cardmarket.json — would push a no-op orphan commit to the data-cm branch and move
+  // `updatedAt` on a run that did nothing, which reads on the page as a fresh scrape.
+  const quietStart = pick("cardmarketQuietStartHour", cardmarket.DEFAULT_QUIET_START_HOUR);
+  const quietEnd = pick("cardmarketQuietEndHour", cardmarket.DEFAULT_QUIET_END_HOUR);
+  if (cardmarket.inQuietHours(Date.now(), quietStart, quietEnd)) {
+    console.log(
+      `quiet hours ${String(quietStart).padStart(2, "0")}:00-${String(quietEnd).padStart(2, "0")}:00 UTC ` +
+        `(now ${new Date().toISOString().slice(11, 16)} UTC): scraping nothing, nothing written. ` +
+        "A balance check (balance_only) is free and still runs.",
+    );
+    return;
+  }
+
   // CM_FORCE is set by the site's "↻ CM" button (a workflow_dispatch input). A manual
   // press means "I want this now", so it ignores the TTL and the per-run limit — but
   // NOT the credit allowance or the reserve. On-demand must never be able to outspend

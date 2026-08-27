@@ -35,6 +35,13 @@ const DEFAULT_DAILY_BUDGET = 6; // fallback cap, used only when the balance can'
 const DEFAULT_MIN_CREDITS = 25;
 const DEFAULT_PER_RUN_LIMIT = 2;
 const DEFAULT_MONTHLY_CREDITS = 1000; // used only when the API reports no billing period
+// The overnight quiet window, in UTC hours [start, end). Cardmarket has no scheduler —
+// nothing but a human starts a scrape — so this guards the on-demand path: a press at
+// 03:00 spends credits nobody is awake to look at. UTC because every other date in this
+// system is: the ledger day rolls at 00:00 UTC and the allowance unlocks with it, so the
+// window opens exactly when the fresh allowance does and closes before the day's use.
+const DEFAULT_QUIET_START_HOUR = 0;
+const DEFAULT_QUIET_END_HOUR = 8;
 // Assume the expensive case until a run measures otherwise: guessing low burns the plan,
 // guessing high only means a slower first day.
 const ASSUMED_COST_PER_SCRAPE = 5;
@@ -55,6 +62,23 @@ function isFresh(prev, ttlMinutes, now) {
 // kept as a counter that could drift: `${day}` in the carried-over meta is compared
 // against today, and a mismatch means the tally starts at zero.
 const utcDay = (now) => new Date(now).toISOString().slice(0, 10);
+
+// True while the clock is inside the quiet window. Equal bounds mean no window at all,
+// which is how the guard is switched off from config. A window that wraps past midnight
+// (start > end, e.g. 22-06) is read as the union of its two halves rather than as an
+// empty range — the 0-8 default doesn't wrap, but a future edit to config shouldn't
+// silently disable the guard.
+function inQuietHours(now, startHour = DEFAULT_QUIET_START_HOUR, endHour = DEFAULT_QUIET_END_HOUR) {
+  // A value that isn't a usable hour falls back to the default window rather than
+  // disabling the guard: a typo in config.json must not silently reopen the night.
+  // Only bounds that are explicitly equal switch the window off.
+  const num = (v, fallback) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : fallback);
+  const start = num(startHour, DEFAULT_QUIET_START_HOUR);
+  const end = num(endHour, DEFAULT_QUIET_END_HOUR);
+  if (start === end) return false;
+  const hour = new Date(now).getUTCHours();
+  return start < end ? hour >= start && hour < end : hour >= start || hour < end;
+}
 
 // How many scrapes are still allowed today by the fallback scrape counter. Only used
 // when the balance can't be read; the credit allowance below is the real control.
@@ -399,9 +423,12 @@ module.exports = {
   dailyCreditAllowance,
   learnCost,
   creditsUsedToday,
+  inQuietHours,
   DEFAULT_TTL_MINUTES,
   DEFAULT_DAILY_BUDGET,
   DEFAULT_MIN_CREDITS,
   DEFAULT_PER_RUN_LIMIT,
   DEFAULT_MONTHLY_CREDITS,
+  DEFAULT_QUIET_START_HOUR,
+  DEFAULT_QUIET_END_HOUR,
 };
