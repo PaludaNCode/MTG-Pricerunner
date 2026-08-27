@@ -26,6 +26,13 @@ if (!fs.existsSync(path.join(WEB, "data.json"))) {
 
 // Cardmarket is served from memory so a test can rewrite its `meta` between cases.
 let cm = JSON.parse(fs.readFileSync(path.join(__dirname, "fixture-cardmarket.json"), "utf8"));
+// The ledger's `day` is stamped to the current UTC day. The fixture's own date is fixed,
+// and the page now treats a ledger from another day as "nothing spent today" — so left
+// alone, every case below would silently exercise the stale path and none would cover
+// the ordinary one. The stale path gets its own case, with its own explicit day.
+const TODAY = new Date().toISOString().slice(0, 10);
+const YESTERDAY = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+cm.meta.day = TODAY;
 const server = http.createServer((req, res) => {
   const u = req.url.split("?")[0];
   if (u === "/cardmarket.json") {
@@ -397,7 +404,42 @@ function check(ok, msg) {
   check((await page.locator("#cm-refresh").textContent()).toLowerCase().includes("budget"), "button says the budget is spent");
   await page.close();
 
+  // Issue #69: cardmarket.json is only rewritten when a run happens, and nothing runs
+  // on a timer — so past 00:00 UTC the published ledger still carries yesterday's spend.
+  // Reading it as today's greyed out the one button that would refresh the figure, on
+  // the very morning the whole allowance was available again.
+  console.log("yesterday's spend does not spend today's allowance");
+  cm = JSON.parse(JSON.stringify(cm));
+  cm.meta.day = YESTERDAY;
+  cm.meta.credits = cm.meta.allowance;
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
+  await page.waitForTimeout(300);
+  check(await page.locator("#cm-refresh").isEnabled(), "the button is armed on the new day");
+  check(
+    !(await page.locator("#cm-refresh").textContent()).toLowerCase().includes("budget"),
+    "and does not claim the budget is spent",
+  );
+  const staleTip = await page.getAttribute("#cm-refresh", "title");
+  check(!/\b3[0-9] of 33\b/.test(staleTip), "the tooltip does not report yesterday's spend as today's: " + staleTip);
+  check(staleTip.includes(YESTERDAY), "it names the day the published ledger came from instead");
+  const railText = await page.locator("#stats").textContent();
+  check(/0 \/ 33 today/.test(railText), "the rail reports no spend today, not yesterday's: " + railText);
+  const creditTip = await page.evaluate(() => {
+    const d = [...document.querySelectorAll("#stats > div")].find((x) => x.querySelector("dt").textContent === "CM credits");
+    return d ? d.querySelector("dd").title : "";
+  });
+  check(
+    creditTip.includes(YESTERDAY),
+    "with the ledger's own day in the tooltip, so the 0 is not mistaken for a run that spent nothing: " + creditTip,
+  );
+  check(
+    /covers about <b>6 cards<\/b>/.test(await page.locator("#legend").innerHTML()),
+    "and the legend prices the full allowance again",
+  );
+  await page.close();
+
   console.log("a rejected token is discarded so the next click can re-prompt");
+  cm.meta.day = TODAY;
   cm.meta.credits = 10;
   page = await open(
     `localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "expired"); window.alert = () => {};`,
