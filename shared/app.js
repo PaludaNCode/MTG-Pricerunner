@@ -11,6 +11,30 @@
   const bust = (u) => u + (u.includes("?") ? "&" : "?") + "t=" + Date.now();
   const load = async (u) => (u ? (await fetch(bust(u))).json() : null);
 
+  // ---- The credit ledger is only true for the day it was written on ----------------
+  // cardmarket.json is rewritten only when a Cardmarket run happens, and nothing starts
+  // that workflow on a timer — it costs credits, so it waits for a human. So after
+  // 00:00 UTC the published `meta` still carries *yesterday's* `day` and `credits`,
+  // while the fetcher's own counters (which gate on the UTC day) have already reset.
+  // Reading those numbers as today's mislabelled the rail, and — worse — let
+  // budgetState() grey out ↻ CM on a morning when the full allowance was available,
+  // blocking the one action that would rewrite the stale figure.
+  //
+  // Everything day-scoped therefore reads the ledger through here: past the UTC
+  // boundary `credits` and `scrapes` come back 0, because that is what has been spent
+  // today. `allowance`, `remaining` and `costPerScrape` are plan-level rather than
+  // day-level, so they are kept as published (the next run recomputes them) — they just
+  // must never be combined with a spend from another day. `stale` carries the fact
+  // onwards for the wording; a ledger with no `day` at all is left alone.
+  const utcDay = (t) => new Date(t).toISOString().slice(0, 10);
+  function dayLedger(meta, now) {
+    if (!meta) return null;
+    if (!meta.day || meta.day === utcDay(now == null ? Date.now() : now)) return { ...meta, stale: false };
+    // The zeroed spend is kept as `priorCredits` so the wording can name what was
+    // spent, and when, instead of presenting the 0 with no provenance.
+    return { ...meta, scrapes: 0, credits: 0, stale: true, priorCredits: meta.credits || 0 };
+  }
+
   async function refresh() {
     try {
       // Cardmarket must never take the page down with it: the branch may not exist yet,
@@ -61,12 +85,12 @@
     // Set before renderLegend and syncPicks: both report how many cards the selection
     // covers, so assigning afterwards left them a poll behind.
     allCards = (ct && ct.meta && ct.meta.cardmarketCards) || [];
-    lastMeta = cm && cm.meta;
+    lastMeta = dayLedger(cm && cm.meta);
     // Remembered so a manual refresh can tell when a genuinely new snapshot lands.
     window.__cmUpdatedAt = cm && cm.updatedAt;
 
-    paintStats(data, totalOffers, cm);
-    renderLegend(cm);
+    paintStats(data, totalOffers, lastMeta);
+    renderLegend(lastMeta);
     syncButton();
     syncPicks();
   }
@@ -77,7 +101,7 @@
   // The header's status rail. Built as data, not as a string, so a fact that does not
   // exist yet is simply not emitted — "CM balance" only appears once a run has read the
   // Firecrawl balance — and so nothing can wrap into the middle of a clause.
-  function paintStats(data, totalOffers, cm) {
+  function paintStats(data, totalOffers, meta) {
     const at = data.updatedAt ? new Date(data.updatedAt) : null;
     const now = new Date();
     const sameDay = at && at.toDateString() === now.toDateString();
@@ -96,7 +120,7 @@
           }
         : { k: "Updated", v: "starting…" },
       { k: "Offers", v: String(totalOffers) },
-      ...cmFields(cm),
+      ...cmFields(meta),
     ]);
   }
 
@@ -104,14 +128,21 @@
   // that file is rewritten by every run even when the budget scraped nothing, so it
   // would read "0m" while every card on screen was days old. Credit spend is the honest
   // global number; per-card ages live on the cards themselves.
-  function cmFields(cm) {
-    const m = cm && cm.meta;
+  function cmFields(m) {
     if (!m) return [{ k: "Cardmarket", v: "never scraped" }];
     if (m.allowance == null) return [{ k: "CM scrapes", v: (m.scrapes || 0) + '<span class="q"> today</span>' }];
+    // A stale ledger reads as a genuine 0 rather than as its own field: the rail is
+    // 2x2 at 320px and a fifth field would give it a third row, and "how current is
+    // Cardmarket?" is already answered per card by the freshness chips — which is why
+    // this field is credit spend and not the file's age. The tooltip says which day
+    // the published ledger came from, so the 0 can be told apart from "a run today
+    // spent nothing".
     const fields = [{
       k: "CM credits",
       v: (m.credits || 0) + `<span class="q"> / ${Math.round(m.allowance)} today</span>`,
-      t: "credits spent today of the day's allowance",
+      t: m.stale
+        ? `no Cardmarket run yet today — the published ledger is from ${m.day} (${m.priorCredits || 0} credits spent that day, of an allowance since renewed)`
+        : "credits spent today of the day's allowance",
     }];
     // The Firecrawl balance, when a run has read it. It is what decides whether the
     // button can spend at all, so it earns a field of its own rather than a parenthesis.
@@ -131,10 +162,9 @@
 
   // One line explaining the model, because "why is this card 3 days old?" and "what
   // will pressing this cost me?" are otherwise unanswerable from the page.
-  function renderLegend(cm) {
+  function renderLegend(m) {
     const el = $("legend");
     if (!el) return;
-    const m = (cm && cm.meta) || null;
     const cost = m && m.costPerScrape;
     const left = m && m.allowance != null ? Math.max(0, m.allowance - (m.credits || 0)) : null;
     const affordable = left != null && cost ? Math.floor(left / cost) : null;
@@ -263,14 +293,19 @@
   };
 
   // Reflect the published credit ledger: a run with no allowance left would defer every
-  // card, so say that instead of letting the button pretend otherwise.
+  // card, so say that instead of letting the button pretend otherwise. `meta` here is
+  // always the day-scoped ledger (see dayLedger) — spend from a previous UTC day reads
+  // as 0, so a new morning arms the button even though nothing has rewritten the file
+  // yet. Doing otherwise disabled the only control that *could* rewrite it.
   function budgetState(meta) {
     if (!meta || meta.allowance == null) return { spent: false, note: "" };
     const used = meta.credits || 0;
     const left = Math.max(0, meta.allowance - used);
     return {
       spent: left < (meta.costPerScrape || 1),
-      note: `${used} of ${Math.round(meta.allowance)} credits used today`,
+      note: meta.stale
+        ? `no credits used today — the last run was ${meta.day}`
+        : `${used} of ${Math.round(meta.allowance)} credits used today`,
     };
   }
 
@@ -530,7 +565,7 @@
             "It should appear within a minute or two — the page keeps checking.",
         );
       } else if (balance) {
-        const m = cm.meta || {};
+        const m = dayLedger(cm.meta) || {};
         notice(
           `<b>${m.remaining != null ? m.remaining : "?"} credits left</b> on the Firecrawl plan · ` +
             `${m.credits || 0} spent today of an allowance of ${Math.round(m.allowance || 0)}` +
@@ -538,7 +573,7 @@
             ". <span class=\"muted\">Nothing was scraped.</span>",
         );
       } else {
-        const m = cm.meta || {};
+        const m = dayLedger(cm.meta) || {};
         const scraped = cm.results.filter((r) => r.fetchedAt && Date.parse(r.fetchedAt) >= startedAt - 60000);
         const offers = scraped.reduce((a, r) => a + (r.offers || []).length, 0);
         const empty = scraped.filter((r) => !(r.offers || []).length).map((r) => r.group);
