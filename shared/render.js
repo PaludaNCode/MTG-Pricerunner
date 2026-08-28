@@ -181,11 +181,13 @@
           });
       }
       merged.sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
-      if (!merged.length) { empty.push(g); continue; }
-      totalOffers += merged.length;
       // Only a card with a Cardmarket entry can be refreshed on demand — CardTrader
       // is free and already refreshes everything every couple of minutes.
       const cmEntries = groups[g].filter((p) => p.site === "cardmarket");
+      // Carried into the chips below rather than dropped: a card showing nothing is
+      // exactly the one you want to re-scrape, so it has to stay pickable.
+      if (!merged.length) { empty.push({ g, cmEntries }); continue; }
+      totalOffers += merged.length;
       cards.push({ g, merged, cmEntries });
     }
 
@@ -195,6 +197,22 @@
     // Falling back to "has scraped data" alone would hide every tick box until the
     // first scrape had already happened.
     const cmCards = opts.cardmarketCards ? new Set(opts.cardmarketCards) : null;
+    // Credits are scarce enough that which cards get refreshed is a real choice, so
+    // each refreshable card carries a tick box. The set lives in app.js (and
+    // localStorage) rather than here, so a poll re-render doesn't clear it.
+    const pickBox = (g, refreshable) =>
+      opts.selectable && refreshable
+        ? `<input type="checkbox" class="pick" data-group="${esc(g)}"${selected.has(g) ? " checked" : ""} aria-label="Include ${esc(g)} in the next Cardmarket refresh" title="Include in the next Cardmarket refresh">`
+        : "";
+    // One listener per box, reading the card name off the element rather than closing
+    // over it, so the chips below can share the wiring with the cards above.
+    const wirePicks = (root) => {
+      if (!opts.onToggle) return;
+      for (const box of root.querySelectorAll(".pick")) {
+        box.addEventListener("change", () => opts.onToggle(box.dataset.group, box.checked));
+      }
+    };
+
     for (const { g, merged, cmEntries } of cards) {
       const refreshable = cmCards ? cmCards.has(g) : cmEntries.length > 0;
       const hiddenCount = merged.length - MAX_VISIBLE_ROWS;
@@ -205,19 +223,13 @@
       ).join("");
       const toggle = collapsible ? `<tr class="row-toggle"><td colspan="${cols.length}"><button type="button">${collapsed ? `Show ${hiddenCount} more ▾` : "Show fewer ▴"}</button></td></tr>` : "";
 
-      // Credits are scarce enough that which cards get refreshed is a real choice, so
-      // each refreshable card carries a tick box. The set lives in app.js (and
-      // localStorage) rather than here, so a poll re-render doesn't clear it.
-      const pick = opts.selectable && refreshable
-        ? `<input type="checkbox" class="pick"${selected.has(g) ? " checked" : ""} aria-label="Include ${esc(g)} in the next Cardmarket refresh" title="Include in the next Cardmarket refresh">`
-        : "";
+      const pick = pickBox(g, refreshable);
 
       const card = document.createElement("div");
       card.className = "card" + (collapsed ? " is-collapsed" : "");
       card.innerHTML = `<h2>${pick}<span>${esc(g)}</span><span class="badges">${cmChip(cmEntries, pending.has(g), refreshable)}<span class="badge">${merged.length}</span></span></h2>
         <table>${colgroup}${head}${rows}${toggle}</table>`;
-      const box = card.querySelector(".pick");
-      if (box && opts.onToggle) box.addEventListener("change", () => opts.onToggle(g, box.checked));
+      wirePicks(card);
       if (collapsible) {
         const btn = card.querySelector(".row-toggle button");
         btn.addEventListener("click", () => {
@@ -233,8 +245,20 @@
       // Under a filter these cards usually do have offers — just not from the source
       // you asked for. Saying "no offers yet" there would read as a fault.
       const why = only ? `no ${SRC_NAME[only]} offers` : "no offers yet";
+      // A card with nothing to show carries the same tick box and freshness chip as one
+      // with a table. It used to be a bare name, which made the card you most want to
+      // re-scrape the only one you could not aim at: with no listings and no box, the
+      // choices were "Select all" (the whole day's allowance) or an untargeted run that
+      // takes the stalest cards. Cards are still ticked by name, so a card that gains
+      // offers keeps its tick as it moves up into the grid.
+      const chips = empty.map(({ g, cmEntries }) => {
+        const refreshable = cmCards ? cmCards.has(g) : cmEntries.length > 0;
+        const pick = pickBox(g, refreshable);
+        return `<span class="chip${errored.has(g) ? " err" : ""}${pick ? " pickable" : ""}">${pick}<span>${esc(g)}</span>${cmChip(cmEntries, pending.has(g), refreshable)}</span>`;
+      }).join("");
       watching.innerHTML = `<div class="label">Watching · ${why} (${empty.length})</div>
-        <div class="chips">${empty.map((g) => `<span class="chip${errored.has(g) ? " err" : ""}">${esc(g)}</span>`).join("")}</div>`;
+        <div class="chips">${chips}</div>`;
+      wirePicks(watching);
     }
     return { totalOffers };
   }

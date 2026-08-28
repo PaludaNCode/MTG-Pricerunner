@@ -1,12 +1,13 @@
 {
-  "_note": "Offline CardTrader feed for the browser checks. Mirrors what update-data.yml publishes to the data branch. Includes a card with no Cardmarket counterpart (Seeker of Skybreak) so the checks cover a card that cannot be refreshed on demand, plus an empty and an errored card for the 'watching' chips.",
+  "_note": "Offline CardTrader feed for the browser checks. Mirrors what update-data.yml publishes to the data branch. Includes a card with no Cardmarket counterpart (Seeker of Skybreak) so the checks cover a card that cannot be refreshed on demand, plus an empty and an errored card for the 'watching' chips. Empty Watch is Cardmarket-watched with no offers from either source, which is the card that has to stay pickable from those chips; Broken Watch is not, so the plain chip is covered too.",
   "updatedAt": "2026-01-01T12:00:00.000Z",
   "meta": {
     "cardmarketCards": [
       "Runehorn Hellkite",
       "Stock Up",
       "Agadeem's Awakening",
-      "Skateboard"
+      "Skateboard",
+      "Empty Watch"
     ]
   },
   "results": [

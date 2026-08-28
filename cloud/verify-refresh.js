@@ -260,21 +260,69 @@ function check(ok, msg) {
 
   await page.locator("#cm-all").click();
   await page.waitForTimeout(400);
-  check((await page.locator("#cm-refresh").textContent()).includes("(4)"), "all four are picked");
+  check((await page.locator("#cm-refresh").textContent()).includes("(5)"), "all five are picked");
   check(
     (await page.locator("#grid .card .pick:checked").count()) === 4,
-    "every Cardmarket-watched card is ticked",
+    "every Cardmarket-watched card with offers is ticked",
+  );
+  check(
+    (await page.locator("#watching .chip .pick:checked").count()) === 1,
+    "and so is the one with no offers — Select all covers the configured list, not the grid",
   );
   const readout = await page.locator("#pick-count").textContent();
-  check(/4 of 4 selected/.test(readout), "the readout counts them: " + readout);
-  check(/~20 credits/.test(readout), "and prices the press before it happens: " + readout);
+  check(/5 of 5 selected/.test(readout), "the readout counts them: " + readout);
+  check(/~25 credits/.test(readout), "and prices the press before it happens: " + readout);
   check(await page.locator("#cm-all").isDisabled(), "Select all has nothing left to do");
 
   await page.locator("#cm-none").click();
   await page.waitForTimeout(400);
   check((await page.locator("#grid .card .pick:checked").count()) === 0, "Clear unticks them");
+  check((await page.locator("#watching .pick:checked").count()) === 0, "including the one in the watching chips");
   check((await page.locator("#cm-refresh").textContent()).trim() === "↻ CM", "and the count goes away");
   check(await page.locator("#cm-none").isDisabled(), "Clear disables itself again");
+  await page.close();
+
+  // The card with nothing on screen is the one you most want to re-scrape, and until the
+  // chips carried a tick box it was the only card you could not aim a run at: the choices
+  // were Select all (the whole day's allowance) or an untargeted stalest-first run.
+  console.log("a Cardmarket-watched card with no offers can be re-scraped on its own");
+  page = await open(`localStorage.setItem(${JSON.stringify(TOKEN_KEY)}, "github_pat_testtoken123")`);
+  const emptyChip = page.locator("#watching .chip", { hasText: "Empty Watch" });
+  check((await emptyChip.locator(".pick").count()) === 1, "it has a tick box in the watching chips");
+  check(
+    (await page.locator("#watching .chip", { hasText: "Broken Watch" }).locator(".pick").count()) === 0,
+    "a card Cardmarket does not watch still has none — nothing to refresh",
+  );
+  check((await emptyChip.locator(".age.new").count()) === 1, "and the chip says it has never been scraped");
+  await emptyChip.locator(".pick").check();
+  check((await page.locator("#cm-refresh").textContent()).includes("(1)"), "ticking it arms the button for one card");
+  let lone = null;
+  await page.route("https://api.github.com/**", (route) => {
+    const u = route.request().url();
+    if (u.includes("/dispatches")) {
+      lone = JSON.parse(route.request().postData() || "{}");
+      return route.fulfill({ status: 204 });
+    }
+    if (u.includes("/runs?event=")) return route.fulfill(runsReply());
+    if (u.includes("/jobs")) {
+      return route.fulfill(
+        jobsReply("in_progress", null, [
+          { name: "Scrape Cardmarket -> cloud/web/cardmarket.json", status: "in_progress", conclusion: null },
+        ]),
+      );
+    }
+    return route.fulfill(json({}));
+  });
+  await page.locator("#cm-refresh").click();
+  await page.waitForTimeout(800);
+  check(lone && lone.inputs.cards === "Empty Watch", "that one card is the whole run: " + (lone && lone.inputs.cards));
+  check((await emptyChip.locator(".age.pending").count()) === 1, "and its chip shows the run in flight");
+  await page.reload();
+  await page.waitForSelector("#grid .card");
+  check(
+    (await page.locator("#watching .chip .pick:checked").count()) === 1,
+    "the tick survives a reload, as the grid's do",
+  );
   await page.close();
 
   console.log("the source filter narrows the grid without refetching anything");
