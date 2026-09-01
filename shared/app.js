@@ -85,9 +85,25 @@
   function paint() {
     const ct = lastCt;
     const cm = lastCm;
+    // `cardmarket.json` is only rewritten when a Cardmarket run happens, and nothing
+    // starts one but a human — so a card removed from config.json keeps serving its last
+    // scraped offers here indefinitely (Verdant Catacombs did, for a day and a half).
+    // `meta.cardmarketCards` is the list config.json watches on Cardmarket *right now*,
+    // rebuilt into data.json every couple of minutes, so it is the authority on what
+    // still belongs on screen. Filtering by it retires a dropped card within one
+    // CardTrader cycle instead of waiting for someone to remember the purge.
+    //
+    // Only when the list actually arrived: if the CardTrader feed failed, `null` means
+    // "unknown", and hiding every Cardmarket row on a failed fetch would turn one
+    // outage into two. An empty list is different — it means the config watches nothing
+    // on Cardmarket, which is a real answer and worth honouring.
+    const watched = (ct && ct.meta && ct.meta.cardmarketCards) || null;
+    const cmWatched = watched ? new Set(watched) : null;
+    const cmResults = ((cm && cm.results) || []).filter((r) => !cmWatched || cmWatched.has(r.group));
+
     const data = {
       updatedAt: ct && ct.updatedAt,
-      results: [...((ct && ct.results) || []), ...((cm && cm.results) || [])],
+      results: [...((ct && ct.results) || []), ...cmResults],
     };
     const { totalOffers } = CardUI.renderGrid(data, {
       showShips: true,

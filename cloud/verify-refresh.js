@@ -33,8 +33,15 @@ let cm = JSON.parse(fs.readFileSync(path.join(__dirname, "fixture-cardmarket.jso
 const TODAY = new Date().toISOString().slice(0, 10);
 const YESTERDAY = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 cm.meta.day = TODAY;
+// The CardTrader feed is served from memory for the same reason as Cardmarket: one case
+// needs to withhold meta.cardmarketCards to prove that an unknown list hides nothing.
+let ct = JSON.parse(fs.readFileSync(path.join(WEB, "data.json"), "utf8"));
 const server = http.createServer((req, res) => {
   const u = req.url.split("?")[0];
+  if (u === "/data.json") {
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify(ct));
+  }
   if (u === "/cardmarket.json") {
     res.setHeader("Content-Type", "application/json");
     return res.end(JSON.stringify(cm));
@@ -564,6 +571,43 @@ function check(ok, msg) {
     "and says nothing about quiet hours",
   );
   await page.close();
+
+  // A card dropped from config.json keeps its offers in cardmarket.json until a run
+  // happens, and nothing but a human starts one — so the page has to stop showing it on
+  // its own. meta.cardmarketCards (from the CardTrader feed, rebuilt every couple of
+  // minutes) is the live list of what is still watched there.
+  console.log("a Cardmarket card no longer in config.json stops being rendered");
+  const ghost = {
+    site: "cardmarket",
+    group: "Verdant Catacombs",
+    variant: "Zendikar",
+    code: "ZEN",
+    productUrl: "https://www.cardmarket.com/en/Magic/Products/Singles/Zendikar/Verdant-Catacombs?language=7",
+    fetchedAt: new Date().toISOString(),
+    offers: [{ price: 42, priceStr: "42,00 €", foil: false, condition: "NM", qty: 1, seller: "x", shipsToMe: null }],
+  };
+  cm.results.push(ghost);
+  page = await open();
+  const bodyText = await page.locator("#grid").textContent();
+  check(!bodyText.includes("Verdant Catacombs"), "the dropped card is gone from the grid");
+  check(bodyText.includes("Runehorn Hellkite"), "a still-watched Cardmarket card is untouched");
+  check(!(await page.locator("#grid").textContent()).includes("42,00"), "and its stale offer is not shown");
+  await page.close();
+
+  // The other half of the rule: an unknown list must not hide anything. If the
+  // CardTrader feed failed there is no list, and blanking every Cardmarket row would
+  // turn one outage into two — so absence of the list means "don't filter", while an
+  // empty list means "nothing is watched" and is honoured.
+  console.log("when the watched list is unavailable, nothing is hidden");
+  const realMeta = ct.meta;
+  ct = { ...ct, meta: {} };
+  page = await open();
+  const noMetaText = await page.locator("#grid").textContent();
+  check(noMetaText.includes("Verdant Catacombs"), "with no list, the Cardmarket row still renders");
+  await page.close();
+  ct = { ...ct, meta: realMeta };
+
+  cm.results = cm.results.filter((r) => r.group !== "Verdant Catacombs");
 
   await browser.close();
   server.close();

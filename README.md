@@ -244,12 +244,14 @@ CardTrader and a Cardmarket URL for the same card puts both sites' offers in one
 price-sorted table. Cardmarket URLs must keep their `?language=7` (Japanese) query —
 that is the only language filter Cardmarket offers, and CI checks it is there.
 
-**Removing a card needs one extra step if it had a Cardmarket entry.** Deleting it from
-`config.json` cleans the CardTrader feed within a couple of minutes, but `cardmarket.json`
-is only rewritten when a Cardmarket run happens — so its offers stay on the page until one
-does. Trigger a **balance check** (the free link, or the workflow's `balance_only` input):
-it scrapes nothing, costs no credits, and republishes the file from the current config,
-which drops the removed card.
+**Removing a card takes effect on the page by itself, but the file lags.** Deleting it
+from `config.json` cleans the CardTrader feed within a couple of minutes, and the page
+stops showing its Cardmarket rows just as fast — it filters them against the live watch
+list that travels in `data.json`. `cardmarket.json` itself is only rewritten when a
+Cardmarket run happens, so the dead entry lingers there until one does. To tidy the file
+(worth doing if you read the published JSON directly), trigger a **balance check** — the
+free link, or the workflow's `balance_only` input: it scrapes nothing, costs no credits,
+and republishes from the current config.
 
 Not every watched card needs a Cardmarket entry, and leaving one out is the cheapest
 knob there is: each entry costs a credit every time it is refreshed, so a card only
