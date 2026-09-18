@@ -46,6 +46,8 @@
     { "url": "https://www.cardtrader.com/en/cards/27071-wooded-foothills-onslaught", "group": "Wooded Foothills", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/27088-bloodstained-mire-onslaught", "group": "Bloodstained Mire", "variant": "Onslaught", "code": "ONS" },
     { "url": "https://www.cardtrader.com/en/cards/401367-giant-s-boulder-the-hobbit", "group": "Giant's Boulder", "variant": "The Hobbit", "code": "HOB" },
+    { "url": "https://www.cardtrader.com/en/cards/303106-bonus-round-the-list-mystery-booster-2", "group": "Bonus Round", "variant": "The List MB2", "code": "PLST" },
+    { "url": "https://www.cardtrader.com/cards/1439-bonus-round-battlebond", "group": "Bonus Round", "variant": "Battlebond", "code": "BBD" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Agadeems-Awakening-Agadeem-the-Undercrypt?language=7", "group": "Agadeem's Awakening", "variant": "All printings", "allVersions": true },
@@ -62,6 +64,7 @@
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Memory-Guardian?language=7", "group": "Memory Guardian", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Shuri-Wakandan-Inventor?language=7", "group": "Shuri, Wakandan Inventor", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Raph-Mikey-Troublemakers?language=7", "group": "Raph & Mikey, Troublemakers", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Bonus-Round?language=7", "group": "Bonus Round", "variant": "All printings", "allVersions": true }
   ]
 }
