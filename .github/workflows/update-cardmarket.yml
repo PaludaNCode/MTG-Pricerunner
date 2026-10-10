@@ -79,6 +79,15 @@ jobs:
           git init -b data-cm
           git add cardmarket.json
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "cardmarket $(date -u +%FT%TZ)"
+          # GitHub's git backend 500s now and then; a force-push of one orphan commit
+          # is idempotent, so ride it out the same way Keepalive does.
+          for delay in 2 4 8; do
+            if git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data-cm; then
+              exit 0
+            fi
+            echo "push failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data-cm
         env:
           GITHUB_TOKEN: ${{ github.token }}

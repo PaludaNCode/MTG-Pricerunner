@@ -27,17 +27,38 @@ const toEur = (amt, cur, rates) => {
 
 const cardUrl = (p) => `https://www.cardtrader.com/en/cards/${p.blueprintId}`;
 
-async function fetchCard(product, rates, token) {
-  const url = `https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=${product.blueprintId}`;
-  let res;
-  for (let tries = 0; tries < 4; tries++) {
-    res = await fetch(url, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
-    if (res.status !== 429) break;
-    await sleep(2000 * (tries + 1)); // back off hard on rate limit
-  }
-  if (!res.ok) return { ...product, productUrl: cardUrl(product), offers: [], error: "HTTP " + res.status };
+// A thrown fetch (ECONNRESET, DNS, timeout) used to escape as an unhandled rejection
+// and kill the whole run over one card. Retry it like a 429; if it keeps failing,
+// report it on that card alone and let the other cards publish.
+const NET_TRIES = 3;
+const TIMEOUT_MS = 20000;
 
-  const data = await res.json();
+async function fetchCard(product, rates, token, opts = {}) {
+  const { fetch: get = fetch, backoffMs = 1000 } = opts;
+  const url = `https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=${product.blueprintId}`;
+  const fail = (error) => ({ ...product, productUrl: cardUrl(product), offers: [], error });
+  let data;
+  for (let net = 1; ; net++) {
+    try {
+      let res;
+      for (let tries = 0; tries < 4; tries++) {
+        res = await get(url, {
+          headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        if (res.status !== 429) break;
+        await sleep(2000 * (tries + 1)); // back off hard on rate limit
+      }
+      if (!res.ok) return fail("HTTP " + res.status);
+      data = await res.json(); // inside the try: a body cut off mid-read throws here
+      break;
+    } catch (e) {
+      const why = (e.cause && e.cause.code) || e.name || "error";
+      if (net >= NET_TRIES) return fail("network: " + why);
+      await sleep(backoffMs * net);
+    }
+  }
+
   const list = data[product.blueprintId] || [];
   const offers = [];
   for (const o of list) {
@@ -64,15 +85,15 @@ async function fetchCard(product, rates, token) {
 
 async function fetchAll(products, opts = {}) {
   const { token, log = console.log } = opts;
-  const rates = await getRates();
+  const rates = opts.rates || (await getRates());
   const results = [];
   for (let i = 0; i < products.length; i++) {
     const p = products[i];
     process.stdout.write(`[ct ${i + 1}/${products.length}] ${p.name} … `);
-    const r = await fetchCard(p, rates, token);
+    const r = await fetchCard(p, rates, token, opts);
     log(`${r.offers.length} offers${r.error ? " (" + r.error + ")" : ""}`);
     results.push(r);
-    if (i < products.length - 1) await sleep(WAIT_MS);
+    if (i < products.length - 1) await sleep(opts.paceMs ?? WAIT_MS);
   }
   return { results };
 }
