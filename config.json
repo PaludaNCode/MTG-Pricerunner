@@ -53,6 +53,10 @@
     { "url": "https://www.cardtrader.com/en/cards/416476-dark-matter-manipulator-reality-fracture-promos", "group": "Dark Matter Manipulator", "variant": "Promos", "code": "PFRA" },
     { "url": "https://www.cardtrader.com/en/cards/289749-barrowgoyf-commander-modern-horizons-3", "group": "Barrowgoyf", "variant": "Commander MH3", "code": "M3C" },
     { "url": "https://www.cardtrader.com/en/cards/289725-barrowgoyf-extended-art-commander-modern-horizons-3-collectors", "group": "Barrowgoyf", "variant": "Extended Art Collectors", "code": "M3C" },
+    { "url": "https://www.cardtrader.com/en/cards/411431-carnivorous-cultivator-enroot-reality-fracture", "group": "Carnivorous Cultivator", "variant": "Reality Fracture", "code": "FRA" },
+    { "url": "https://www.cardtrader.com/en/cards/411730-carnivorous-cultivator-enroot-extended-art-reality-fracture-collectors", "group": "Carnivorous Cultivator", "variant": "Extended Art Collectors", "code": "FRA" },
+    { "url": "https://www.cardtrader.com/en/cards/416475-carnivorous-cultivator-enroot-reality-fracture-promos", "group": "Carnivorous Cultivator", "variant": "Promos", "code": "PFRA" },
+    { "url": "https://www.cardtrader.com/en/cards/411737-carnivorous-cultivator-enroot-bundle-promo-reality-fracture-promos", "group": "Carnivorous Cultivator", "variant": "Bundle Promo", "code": "PFRA" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Agadeems-Awakening-Agadeem-the-Undercrypt?language=7", "group": "Agadeem's Awakening", "variant": "All printings", "allVersions": true },
