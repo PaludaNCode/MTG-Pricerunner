@@ -33,7 +33,23 @@ const cardUrl = (p) => `https://www.cardtrader.com/en/cards/${p.blueprintId}`;
 const NET_TRIES = 3;
 const TIMEOUT_MS = 20000;
 
-async function fetchCard(product, rates, token, opts = {}) {
+// A rejected response is only "HTTP 403" to the run, but its body says *who* refused
+// us: CardTrader's own error JSON names a bad or revoked token, Cloudflare's page
+// names a blocked runner IP. The run keeps the first one it sees (truncated, with the
+// server header) and fetchAll prints it under that card's line, so an Actions log
+// diagnoses itself instead of 51 bare status codes. Once per run: they all say the
+// same thing, and the log stays readable.
+async function describeRejection(res) {
+  let body = "";
+  try {
+    body = (await res.text()).replace(/\s+/g, " ").trim().slice(0, 300);
+  } catch {}
+  const h = res.headers && typeof res.headers.get === "function" ? res.headers : null;
+  const via = h ? [h.get("server"), h.get("cf-ray") && "cf-ray " + h.get("cf-ray")].filter(Boolean).join(", ") : "";
+  return `HTTP ${res.status}${via ? " via " + via : ""}: ${body || "(empty body)"}`;
+}
+
+async function fetchCard(product, rates, token, opts = {}, diag = {}) {
   const { fetch: get = fetch, backoffMs = 1000 } = opts;
   const url = `https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=${product.blueprintId}`;
   const fail = (error) => ({ ...product, productUrl: cardUrl(product), offers: [], error });
@@ -49,7 +65,13 @@ async function fetchCard(product, rates, token, opts = {}) {
         if (res.status !== 429) break;
         await sleep(2000 * (tries + 1)); // back off hard on rate limit
       }
-      if (!res.ok) return fail("HTTP " + res.status);
+      if (!res.ok) {
+        if (!diag.seen) {
+          diag.seen = true;
+          diag.rejection = await describeRejection(res);
+        }
+        return fail("HTTP " + res.status);
+      }
       data = await res.json(); // inside the try: a body cut off mid-read throws here
       break;
     } catch (e) {
@@ -87,11 +109,16 @@ async function fetchAll(products, opts = {}) {
   const { token, log = console.log } = opts;
   const rates = opts.rates || (await getRates());
   const results = [];
+  const diag = {};
   for (let i = 0; i < products.length; i++) {
     const p = products[i];
     process.stdout.write(`[ct ${i + 1}/${products.length}] ${p.name} … `);
-    const r = await fetchCard(p, rates, token, opts);
+    const r = await fetchCard(p, rates, token, opts, diag);
     log(`${r.offers.length} offers${r.error ? " (" + r.error + ")" : ""}`);
+    if (diag.rejection) {
+      log(`[ct] first rejected response — ${diag.rejection}`);
+      diag.rejection = null;
+    }
     results.push(r);
     if (i < products.length - 1) await sleep(opts.paceMs ?? WAIT_MS);
   }

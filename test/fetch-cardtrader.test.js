@@ -56,3 +56,23 @@ test("an HTTP error is reported without retrying", async () => {
   assert.equal(n, 1);
   assert.equal(results[0].error, "HTTP 500");
 });
+
+test("the first rejected response is described once, body and server included", async () => {
+  const lines = [];
+  const blocked = {
+    ok: false,
+    status: 403,
+    headers: new Headers({ server: "cloudflare", "cf-ray": "abc123-CPH" }),
+    text: async () => "<html>\n  <title>Attention Required! | Cloudflare</title>\n</html>",
+  };
+  const write = process.stdout.write;
+  process.stdout.write = () => true;
+  const { results } = await fetchAll([product(5), product(6)], { ...FAST, log: (l) => lines.push(l), fetch: async () => blocked }).finally(
+    () => (process.stdout.write = write),
+  );
+  assert.equal(results[0].error, "HTTP 403");
+  assert.equal(results[1].error, "HTTP 403");
+  const described = lines.filter((l) => l.startsWith("[ct] first rejected response"));
+  assert.equal(described.length, 1);
+  assert.match(described[0], /HTTP 403 via cloudflare, cf-ray abc123-CPH: <html> <title>Attention Required! \| Cloudflare<\/title> <\/html>/);
+});
