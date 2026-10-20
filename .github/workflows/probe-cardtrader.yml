@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Runner public IP
         run: curl -sS --max-time 10 https://api.ipify.org; echo
-      - name: Two requests, one card
+      - name: One card, UA variants
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
         run: |
@@ -25,8 +25,10 @@ jobs:
           console.log("token present:", token.length > 0, "length:", token.length);
           const show = ["server", "cf-ray", "cf-mitigated", "content-type", "retry-after",
             "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset", "www-authenticate"];
-          async function probe(label, url) {
-            const res = await fetch(url, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+          async function probe(label, url, ua) {
+            const headers = { Authorization: "Bearer " + token, Accept: "application/json" };
+            if (ua) headers["User-Agent"] = ua;
+            const res = await fetch(url, { headers });
             console.log(`\n== ${label}: HTTP ${res.status} ${res.statusText}`);
             for (const h of show) if (res.headers.get(h)) console.log(`   ${h}: ${res.headers.get(h)}`);
             const body = await res.text();
@@ -40,8 +42,15 @@ jobs:
             }
           }
           (async () => {
-            await probe("token check /info", "https://api.cardtrader.com/api/v2/info");
-            await probe("one card (Runehorn Hellkite, 232333)",
-              "https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=232333");
+            const card = "https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=232333";
+            await probe("one card, descriptive UA", card, "mtg-pricerunner/1.0 (+https://github.com/PaludaNCode/MTG-Pricerunner)");
+            await probe("one card, browser UA", card, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36");
           })();
           JS
+      - name: One card via curl
+        env:
+          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+        run: |
+          curl -sS -o /tmp/b -w "curl: HTTP %{http_code}\n" -H "Authorization: Bearer $CARDTRADER_TOKEN" \
+            "https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=232333"
+          head -c 120 /tmp/b; echo
