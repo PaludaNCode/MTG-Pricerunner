@@ -74,6 +74,9 @@
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Shuri-Wakandan-Inventor?language=7", "group": "Shuri, Wakandan Inventor", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Raph-Mikey-Troublemakers?language=7", "group": "Raph & Mikey, Troublemakers", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Hex-Magic?language=7", "group": "Hex Magic", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Bonus-Round?language=7", "group": "Bonus Round", "variant": "All printings", "allVersions": true }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Bonus-Round?language=7", "group": "Bonus Round", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Dark-Matter-Manipulator?language=7", "group": "Dark Matter Manipulator", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Barrowgoyf?language=7", "group": "Barrowgoyf", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Carnivorous-Cultivator-Enroot?language=7", "group": "Carnivorous Cultivator", "variant": "All printings", "allVersions": true }
   ]
 }
