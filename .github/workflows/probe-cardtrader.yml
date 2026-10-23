@@ -1,0 +1,48 @@
+# TEMPORARY — diagnostic for the 2026-10-19 CardTrader 403s. Two API requests,
+# nothing published, no branch touched. Run it from Actions -> Run workflow (any
+# branch that carries this file). Delete before merging anything to main.
+name: Probe CardTrader (temporary)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [fix/cardtrader-probe]
+    paths: [".github/workflows/probe-cardtrader.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner public IP
+        run: curl -sS --max-time 10 https://api.ipify.org; echo
+      - name: Account endpoint, then one card (Into the Flood Maw, Bloomburrow)
+        env:
+          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+        run: |
+          node - <<'JS'
+          const token = process.env.CARDTRADER_TOKEN || "";
+          console.log("token present:", token.length > 0, "length:", token.length);
+          const show = ["server", "cf-ray", "cf-mitigated", "content-type", "retry-after",
+            "x-ratelimit-limit", "x-ratelimit-remaining", "www-authenticate"];
+          async function probe(label, url) {
+            const res = await fetch(url, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+            console.log(`\n== ${label}: HTTP ${res.status} ${res.statusText}`);
+            for (const h of show) if (res.headers.get(h)) console.log(`   ${h}: ${res.headers.get(h)}`);
+            const body = await res.text();
+            if (res.ok) {
+              // Public log: never print the account payload, only its shape.
+              try { const j = JSON.parse(body); console.log("   ok, keys:", Object.keys(j).join(", "),
+                "| offers:", Array.isArray(j[292964]) ? j[292964].length : "n/a"); }
+              catch { console.log("   ok, non-JSON body of", body.length, "chars"); }
+            } else {
+              console.log("   body:", body.replace(/\s+/g, " ").slice(0, 400));
+            }
+          }
+          (async () => {
+            await probe("account /info", "https://api.cardtrader.com/api/v2/info");
+            await probe("one card 292964", "https://api.cardtrader.com/api/v2/marketplace/products?blueprint_id=292964");
+          })();
+          JS
