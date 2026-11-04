@@ -57,6 +57,10 @@
     { "url": "https://www.cardtrader.com/en/cards/411730-carnivorous-cultivator-enroot-extended-art-reality-fracture-collectors", "group": "Carnivorous Cultivator", "variant": "Extended Art Collectors", "code": "FRA" },
     { "url": "https://www.cardtrader.com/en/cards/416475-carnivorous-cultivator-enroot-reality-fracture-promos", "group": "Carnivorous Cultivator", "variant": "Promos", "code": "PFRA" },
     { "url": "https://www.cardtrader.com/en/cards/411737-carnivorous-cultivator-enroot-bundle-promo-reality-fracture-promos", "group": "Carnivorous Cultivator", "variant": "Bundle Promo", "code": "PFRA" },
+    { "url": "https://www.cardtrader.com/en/cards/256768-beseech-the-mirror-wilds-of-eldraine", "group": "Beseech the Mirror", "variant": "Wilds of Eldraine", "code": "WOE" },
+    { "url": "https://www.cardtrader.com/en/cards/256770-beseech-the-mirror-extended-art-wilds-of-eldraine-collectors", "group": "Beseech the Mirror", "variant": "Extended Art Collectors", "code": "WOE" },
+    { "url": "https://www.cardtrader.com/en/cards/259689-beseech-the-mirror-wilds-of-eldraine-promos", "group": "Beseech the Mirror", "variant": "Promos", "code": "PWOE" },
+    { "url": "https://www.cardtrader.com/en/cards/259587-beseech-the-mirror-wilds-of-eldraine-prerelease", "group": "Beseech the Mirror", "variant": "Prerelease", "code": "PWOE" },
 
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Runehorn-Hellkite?language=7", "group": "Runehorn Hellkite", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Agadeems-Awakening-Agadeem-the-Undercrypt?language=7", "group": "Agadeem's Awakening", "variant": "All printings", "allVersions": true },
@@ -77,6 +81,7 @@
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Bonus-Round?language=7", "group": "Bonus Round", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Dark-Matter-Manipulator?language=7", "group": "Dark Matter Manipulator", "variant": "All printings", "allVersions": true },
     { "url": "https://www.cardmarket.com/en/Magic/Cards/Barrowgoyf?language=7", "group": "Barrowgoyf", "variant": "All printings", "allVersions": true },
-    { "url": "https://www.cardmarket.com/en/Magic/Cards/Carnivorous-Cultivator-Enroot?language=7", "group": "Carnivorous Cultivator", "variant": "All printings", "allVersions": true }
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Carnivorous-Cultivator-Enroot?language=7", "group": "Carnivorous Cultivator", "variant": "All printings", "allVersions": true },
+    { "url": "https://www.cardmarket.com/en/Magic/Cards/Beseech-the-Mirror?language=7", "group": "Beseech the Mirror", "variant": "All printings", "allVersions": true }
   ]
 }
