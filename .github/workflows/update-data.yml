@@ -27,6 +27,14 @@ concurrency:
 
 jobs:
   publish-data:
+    # PAUSED 2026-11-11. api.cardtrader.com has answered every request since 15:36 UTC
+    # with a Cloudflare challenge (HTTP 403, "Just a moment..."), as it did for four days
+    # from 2026-10-19. While that holds, each run is one blocked request, a red run and a
+    # failure mail, roughly twenty times an hour from the external pinger. Skipping the
+    # job keeps the pinger's dispatch calls succeeding (204) and sends no mail, and the
+    # last good data.json stays on the data branch. To resume, delete the `if:` line
+    # below in a PR — and consider a slower pinger cadence first (docs/external-pinger.md).
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
