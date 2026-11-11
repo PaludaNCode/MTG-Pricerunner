@@ -26,7 +26,8 @@
       "name": "Agadeem's Awakening", "productUrl": "https://example.com/cm/agadeem",
       "fetchedAt": "2025-12-30T22:00:00.000Z",
       "offers": [
-        { "price": 19.5, "priceStr": "19.50 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising", "code": "ZNR", "productUrl": "https://example.com/cm/znr" }
+        { "price": 19.5, "priceStr": "19.50 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising", "code": "ZNR", "productUrl": "https://example.com/cm/znr" },
+        { "price": 31, "priceStr": "31.00 €", "foil": false, "condition": "NM", "qty": 1, "seller": "ZendikarFan", "location": "Japan", "language": null, "shipsToMe": null, "variant": "Zendikar Rising Extras", "code": "XZNR", "productUrl": "https://example.com/cm/xznr" }
       ]
     }
   ]
