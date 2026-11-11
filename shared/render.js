@@ -70,10 +70,15 @@
       const promo = printings.find((p) => /^p/i.test(p.code));
       return promo ? promo.code : "";
     }
-    // 3. "<Set> Extras" is Cardmarket's split for showcase and extended-art printings,
-    //    which Scryfall keeps inside the base set.
-    const base = printings.find((p) => !/^p/i.test(p.code) && v.startsWith(normSet(p.variant) + " "));
-    if (base) return base.code;
+    // 3. "<Set> Extras" is Cardmarket's split for showcase and extended-art printings.
+    //    Scryfall keeps those inside the base set, and this rule used to say so — which
+    //    put Beseech the Mirror's regular and extended-art offers under one "WOE", in
+    //    the same table, with nothing but the tooltip to tell 15 € from 35 €. On
+    //    Cardmarket the Extras *are* a printing, with their own code (XWOE, XZNR), and
+    //    that code is what the thumbnail yields; the base code is the one answer that
+    //    is wrong for every such row. So never resolve one: the scraped code shows
+    //    when there is one, the full name when there is not.
+    if (/\bextras\b/.test(v)) return "";
     // 4. When every CardTrader printing of this card is the same set, that is the set,
     //    whatever either site calls it ("Secrets of Strixhaven" vs "Strixhaven"). Only
     //    when Cardmarket is showing one printing too: otherwise a card watched on one
@@ -174,7 +179,8 @@
             // A curated code beats the scraped one when the row's printing is known:
             // both sites abbreviate, and two spellings of one set in a single table
             // reads as two different printings. Scraped is the next best thing, and the
-            // full name is what is left when neither knows.
+            // full name is what is left when neither knows. The resolver declines an
+            // "Extras" row on purpose (see resolveCode), so its scraped code shows.
             _code: o.variant ? codeFor(o.variant) || o.code || "" : o.code || fallback.code || "",
             _site: p.site,
             _url: o.productUrl || p.productUrl,

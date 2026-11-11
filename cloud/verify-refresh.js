@@ -400,6 +400,16 @@ function check(ok, msg) {
     (await cellFor("Stock Up", "Aetherdrift")) === "DFT",
     "a row that did carry a scraped code still shows it",
   );
+  // Cardmarket files showcase and extended-art printings as "<Set> Extras", a printing
+  // of its own with its own code. Resolving that to the base set (where Scryfall keeps
+  // them) put both printings of a card under one code in one table — every Beseech the
+  // Mirror row read "WOE" — so an Extras row keeps the code it was scraped with.
+  check(
+    (await cellFor("Agadeem's Awakening", "Zendikar Rising")) === "ZNR" &&
+      (await cellFor("Agadeem's Awakening", "Zendikar Rising Extras")) === "XZNR",
+    "an Extras printing keeps its own scraped code instead of collapsing into the base set: " +
+      (await cellFor("Agadeem's Awakening", "Zendikar Rising Extras")),
+  );
   check(
     (await page.locator("#grid .card", { hasText: "Runehorn Hellkite" }).locator("td.c-set a").first().getAttribute("title")).length > 3,
     "the full set name survives as the link tooltip at every width",
