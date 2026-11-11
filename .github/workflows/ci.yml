@@ -29,8 +29,16 @@ jobs:
         run: node cloud/verify-set-codes.js
       - name: Install dependencies
         run: npm ci
+      # Two commands, not `install --with-deps`, and the deps half may fail. On this image
+      # the "deps" are nine font packages (CJK, unifont, freefont, xfonts) — every shared
+      # library Chromium needs is already present — and on 2026-11-11 the runners could
+      # not resolve the Ubuntu mirrors for over an hour, so both browser checks died
+      # before they ran, over fonts that none of the asserted layout uses. The browser is
+      # downloaded first so it is there whatever apt does; a warning marks a degraded run.
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install chromium
+          npx playwright install-deps chromium || echo "::warning::playwright install-deps failed (apt could not fetch the font packages); running the browser checks with the image's own fonts"
       - name: UI smoke test (render + responsive overflow)
         run: node cloud/verify-mobile.js
       - name: Refresh-button behaviour (dispatch payload, token, budget state)
