@@ -131,3 +131,15 @@ test("an ordinary HTTP 500 neither stops the run nor marks it blocked", async ()
   assert.equal(results[0].error, "HTTP 500");
   assert.equal(results[1].offers.length, 1);
 });
+
+// The pause between cards is about a second with jitter — never the old 250 ms burst,
+// never long enough for a 55-card run to crowd the 10-minute cadence.
+test("the pace between cards is 800–1400 ms, jittered", () => {
+  const { paceMs, PACE_MIN_MS, PACE_MAX_MS } = require("../cloud/fetch-cardtrader");
+  assert.equal(paceMs(() => 0), PACE_MIN_MS);
+  assert.equal(paceMs(() => 0.999999), PACE_MAX_MS);
+  assert.ok(PACE_MIN_MS >= 800 && PACE_MAX_MS <= 1400, "a 55-card run stays around a minute");
+  const seen = new Set(Array.from({ length: 200 }, () => paceMs()));
+  assert.ok(seen.size > 20, "the jitter actually varies");
+  for (const v of seen) assert.ok(v >= PACE_MIN_MS && v <= PACE_MAX_MS);
+});
