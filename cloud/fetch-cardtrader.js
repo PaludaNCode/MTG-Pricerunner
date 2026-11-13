@@ -8,7 +8,15 @@
 //
 // Module only — cloud/build-data.js is the entry point that writes data.json.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const WAIT_MS = 250; // pace between cards
+// Pace between cards: about a second, with jitter. Each run lands on a fresh runner IP,
+// so what Cloudflare sees from one address is the burst inside a single run — 55
+// requests in 25 s at the old 250 ms looked like ~130 a minute from nowhere. A second
+// apart is ~50 a minute and a run of just over a minute against a 10-minute cadence;
+// the jitter keeps the timing from being metronomic. CardTrader's own limit (200 per
+// 10 s) was never the issue. Tests pass paceMs: 0 to skip the wait.
+const PACE_MIN_MS = 800;
+const PACE_MAX_MS = 1400;
+const paceMs = (rand = Math.random) => PACE_MIN_MS + Math.floor(rand() * (PACE_MAX_MS - PACE_MIN_MS + 1));
 
 async function getRates() {
   try {
@@ -148,9 +156,9 @@ async function fetchAll(products, opts = {}) {
       for (const q of rest) results.push({ ...q, productUrl: cardUrl(q), offers: [], error: CHALLENGED });
       return { results, blocked: true };
     }
-    if (i < products.length - 1) await sleep(opts.paceMs ?? WAIT_MS);
+    if (i < products.length - 1) await sleep(opts.paceMs ?? paceMs());
   }
   return { results, blocked: false };
 }
 
-module.exports = { fetchAll, isChallenge };
+module.exports = { fetchAll, isChallenge, paceMs, PACE_MIN_MS, PACE_MAX_MS };
