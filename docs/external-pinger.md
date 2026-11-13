@@ -6,8 +6,25 @@ external scheduler POSTing the dispatch endpoint is the only way to get reliable
 cadence on the free tier. The in-repo cron stays as a fallback.
 
 **Current setup (live):** a cron-job.org job pings the dispatch endpoint every
-**2 minutes**, so `data.json` refreshes at that cadence. The steps below document
+**10 minutes**, so `data.json` refreshes at that cadence. The steps below document
 how it was set up / how to recreate it.
+
+## Cadence: why 10 minutes and not 2
+
+The job ran every 2 minutes from July to November 2026 and was fine while the watch
+list was ~30 CardTrader printings (~600 requests/hour). Once the list passed 50, the
+same cadence meant ~1,100 identical requests an hour from datacentre IPs, and
+Cloudflare in front of `api.cardtrader.com` challenged the runner twice: four days
+from 2026-10-19, ~42 hours from 2026-11-11. CardTrader's own limit (200 requests per
+10 s) was never near; this is bot scoring on the pattern. 10 minutes with 55 printings
+is ~330 requests/hour — half the level that ran clean for months. If the list grows
+past ~100 printings, slow the pinger again before Cloudflare does it for you.
+
+The in-repo fallback cron is set to the same 10 minutes. `build-data.js` also carries a
+breaker: a challenged run records a wait in `meta.cardtrader` (1 h, doubling to 8 h) and
+the runs inside it make no request at all — so a block costs a few quiet probes a day,
+not a mail per run, and clears itself. The `probe_now` input on the workflow ignores an
+open breaker for one run.
 
 ## 1. Create a fine-grained PAT
 
@@ -40,8 +57,8 @@ Expect HTTP 204 and a new "Update card data" run in the Actions tab within secon
 Create a job:
 
 - **URL**: `https://api.github.com/repos/PaludaNCode/MTG-Pricerunner/actions/workflows/update-data.yml/dispatches`
-- **Schedule**: every 2 minutes (a coarser interval also works — over-pinging is
-  harmless, see Notes; each ping is one Actions run, free on public repos)
+- **Schedule**: every 10 minutes (see *Cadence* above before going faster — each ping is
+  one Actions run, free on public repos, but every run is 55 CardTrader requests)
 - **Request method**: POST
 - **Headers**:
   - `Authorization: Bearer <PAT>`

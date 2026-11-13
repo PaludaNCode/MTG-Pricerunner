@@ -2,8 +2,17 @@ name: Update card data
 
 on:
   schedule:
-    - cron: "2-57/5 * * * *" # offset from :00/:05 — GitHub's scheduler is least contended off the round minutes
-  workflow_dispatch: {} # manual run button + external pinger target
+    # Fallback only — the real cadence is the external pinger (docs/external-pinger.md),
+    # every 10 minutes; this matches it. Offset from the round minutes, where GitHub's
+    # scheduler is least contended. Not faster: 55 printings every 2 minutes is what
+    # earned the Cloudflare blocks of 2026-10-19 and 2026-11-11.
+    - cron: "3-53/10 * * * *"
+  workflow_dispatch: # manual run button + external pinger target
+    inputs:
+      probe_now:
+        description: "Ignore an open CardTrader breaker and probe once now"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -27,29 +36,36 @@ concurrency:
 
 jobs:
   publish-data:
-    # PAUSED 2026-11-11. api.cardtrader.com has answered every request since 15:36 UTC
-    # with a Cloudflare challenge (HTTP 403, "Just a moment..."), as it did for four days
-    # from 2026-10-19. While that holds, each run is one blocked request, a red run and a
-    # failure mail, roughly twenty times an hour from the external pinger. Skipping the
-    # job keeps the pinger's dispatch calls succeeding (204) and sends no mail, and the
-    # last good data.json stays on the data branch. To resume, delete the `if:` line
-    # below in a PR — and consider a slower pinger cadence first (docs/external-pinger.md).
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      # CardTrader only, and stateless by design: nothing is carried between runs, so
-      # a failed run costs nothing but a stale minute. Cardmarket has its own workflow.
+      # The previous data.json rides along for one reason: the CardTrader breaker in
+      # build-data.js keeps its state in meta.cardtrader, and a challenged run republishes
+      # the old file with that state instead of publishing nothing. The data branch may
+      # not exist yet (first run) — then there is simply no --prev.
+      - name: Fetch the previous data.json from the data branch
+        run: |
+          if git fetch --depth=1 origin data 2>/dev/null && git show FETCH_HEAD:data.json > "$RUNNER_TEMP/prev-data.json"; then
+            echo "PREV=$RUNNER_TEMP/prev-data.json" >> "$GITHUB_ENV"
+          else
+            echo "no previous data.json (first run, or the data branch is missing)"
+          fi
+      # CardTrader only; Cardmarket has its own workflow. Three outcomes: a fresh
+      # data.json; the previous one with breaker state (Cloudflare challenged the run,
+      # green with a warning); or no file at all (the breaker is still open — no request
+      # was made). Only the first two publish.
       - name: Fetch CardTrader data -> cloud/web/data.json
-        run: node cloud/build-data.js
+        run: node cloud/build-data.js ${PREV:+--prev "$PREV"}
         env:
           CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
+          CT_PROBE_NOW: ${{ inputs.probe_now && 'true' || 'false' }}
       # The data branch is a build artifact: a single orphan commit, force-pushed
       # every run so history never grows. Never branch from it or PR into it.
       - name: Publish data.json to the data branch
+        if: hashFiles('cloud/web/data.json') != ''
         run: |
           d=$(mktemp -d)
           cp cloud/web/data.json "$d/"
