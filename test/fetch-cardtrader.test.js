@@ -2,7 +2,7 @@
 // retries it, and if it keeps failing reports it on that card alone.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { fetchAll, offerPrice } = require("../cloud/fetch-cardtrader");
+const { fetchAll, offerPrice, REQUIRED_FIELDS } = require("../cloud/fetch-cardtrader");
 
 const product = (id) => ({ site: "cardtrader", group: "Card " + id, name: "Card " + id, blueprintId: id });
 const reset = () => Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }) });
@@ -172,20 +172,67 @@ test("a foreign-currency price is converted to euros", async () => {
   assert.equal(results[0].offers[0].price, 5);
 });
 
-test("an offer without a readable price logs its field names once", async () => {
-  const lines = [];
+// ---- The real API shape -----------------------------------------------------------
+//
+// Every test above feeds the fetcher a response written by hand, which is why the old
+// price_cents fixture kept passing after CardTrader dropped the field. These use two
+// offers captured by the probe on fix/cardtrader-probe (2026-11-25): one foil, one not,
+// with the seller's strings redacted. Treat the file as a specimen — don't tidy it.
+const SPECIMEN = require("./fixtures/cardtrader-products.json");
+const specimenRun = (body = SPECIMEN, extra = {}) => {
   const write = process.stdout.write;
   process.stdout.write = () => true;
-  try {
-    await fetchAll([product(7), product(8)], {
-      ...FAST,
-      log: (l) => lines.push(l),
-      fetch: async (url) => ({ ok: true, status: 200, json: async () => ({ [url.split("=")[1]]: [{ amount: 1, properties_hash: {} }] }) }),
-    });
-  } finally {
-    process.stdout.write = write;
+  return fetchAll([product(292964)], {
+    ...FAST,
+    ...extra,
+    fetch: async () => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)) }),
+  }).finally(() => (process.stdout.write = write));
+};
+const OUTPUT_FIELDS = ["price", "priceStr", "foil", "condition", "qty", "seller", "language", "shipsToMe"];
+
+test("specimen: every field of every offer is filled", async () => {
+  const { results, missingFields } = await specimenRun();
+  const offers = results[0].offers;
+  assert.equal(offers.length, 2);
+  for (const o of offers) {
+    assert.deepEqual(Object.keys(o).sort(), [...OUTPUT_FIELDS].sort());
+    for (const f of OUTPUT_FIELDS) assert.ok(o[f] !== null && o[f] !== undefined, `${f} is empty`);
   }
-  const hits = lines.filter((l) => l.includes("without a readable price"));
-  assert.equal(hits.length, 1);
-  assert.match(hits[0], /amount, properties_hash/);
+  assert.deepEqual(missingFields, []);
+});
+
+test("specimen: values map through correctly, foil and not", async () => {
+  const [foil, plain] = (await specimenRun()).results[0].offers;
+  assert.deepEqual(foil, { price: 2.09, priceStr: "2.09 €", foil: true, condition: "Near Mint", qty: 1, seller: "<redacted>", language: "es", shipsToMe: true });
+  assert.deepEqual(plain, { price: 0.62, priceStr: "0.62 €", foil: false, condition: "Near Mint", qty: 1, seller: "<redacted>", language: "fr", shipsToMe: false });
+});
+
+test("specimen carries every required field, so the list matches the real API", () => {
+  const get = (o, path) => path.split(".").reduce((v, k) => (v == null ? v : v[k]), o);
+  for (const o of SPECIMEN[292964]) for (const f of REQUIRED_FIELDS) assert.notEqual(get(o, f), undefined, f);
+});
+
+// Drop one required field from every offer, as an API change would: the run must name it.
+for (const field of REQUIRED_FIELDS) {
+  test(`a run where no offer carries ${field} reports it`, async () => {
+    const body = JSON.parse(JSON.stringify(SPECIMEN));
+    const [head, last] = [field.split(".").slice(0, -1), field.split(".").pop()];
+    for (const o of body[292964]) delete head.reduce((v, k) => v[k], o)[last];
+    const lines = [];
+    const { missingFields } = await specimenRun(body, { log: (l) => lines.push(l) });
+    assert.deepEqual(missingFields, [field]);
+    const hits = lines.filter((l) => l.includes("missing from all"));
+    assert.equal(hits.length, 1);
+    assert.match(hits[0], /an offer's fields: id, blueprint_id/);
+  });
+}
+
+test("a field missing from only some offers is not reported", async () => {
+  const body = JSON.parse(JSON.stringify(SPECIMEN));
+  delete body[292964][0].user.can_sell_via_hub;
+  assert.deepEqual((await specimenRun(body)).missingFields, []);
+});
+
+test("a run with no offers at all reports nothing missing", async () => {
+  assert.deepEqual((await specimenRun({ 292964: [] })).missingFields, []);
 });
