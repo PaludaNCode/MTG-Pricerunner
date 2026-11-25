@@ -33,6 +33,18 @@ const toEur = (amt, cur, rates) => {
   return r ? amt / r : null;
 };
 
+// An offer's price as { amount, currency }. Since 2026-11-25 the API sends it only as a
+// nested `price: { cents, currency }`; the flat `price_cents`/`price_currency` this used
+// to read are gone, and with them every price on the page — the runs stayed green and
+// published 179 offers at price: null. Read the nested object first and keep the flat
+// fields as a fallback, so a change in either direction can't blank the page again.
+function offerPrice(o) {
+  const nested = o.price && typeof o.price === "object" ? o.price : null;
+  const cents = nested && nested.cents != null ? nested.cents : o.price_cents;
+  const currency = (nested && nested.currency) || o.price_currency || "EUR";
+  return { amount: cents != null && Number.isFinite(+cents) ? +cents / 100 : null, currency: String(currency).toUpperCase() };
+}
+
 const cardUrl = (p) => `https://www.cardtrader.com/en/cards/${p.blueprintId}`;
 
 // A thrown fetch (ECONNRESET, DNS, timeout) used to escape as an unhandled rejection
@@ -114,8 +126,8 @@ async function fetchCard(product, rates, token, opts = {}, diag = {}) {
     const ph = o.properties_hash || {};
     const lang = (ph.mtg_language || "").toLowerCase() || null;
     if (product.language && lang !== product.language.toLowerCase()) continue;
-    const rawAmt = o.price_cents != null ? o.price_cents / 100 : null;
-    const rawCur = (o.price_currency || "EUR").toUpperCase();
+    const { amount: rawAmt, currency: rawCur } = offerPrice(o);
+    if (rawAmt == null && !diag.unpriced) diag.unpriced = Object.keys(o).join(", ");
     const eur = rawCur === "EUR" ? rawAmt : toEur(rawAmt, rawCur, rates);
     offers.push({
       price: eur != null ? eur : rawAmt,
@@ -146,6 +158,11 @@ async function fetchAll(products, opts = {}) {
       log(`[ct] first rejected response — ${diag.rejection}`);
       diag.rejection = null;
     }
+    if (diag.unpriced && !diag.unpricedLogged) {
+      // Once per run: the field names are what tells us where the price went.
+      log(`[ct] an offer came back without a readable price — its fields: ${diag.unpriced}`);
+      diag.unpricedLogged = true;
+    }
     results.push(r);
     if (diag.challenged) {
       // Stop here. The remaining cards are reported as errored so the result set stays
@@ -161,4 +178,4 @@ async function fetchAll(products, opts = {}) {
   return { results, blocked: false };
 }
 
-module.exports = { fetchAll, isChallenge, paceMs, PACE_MIN_MS, PACE_MAX_MS };
+module.exports = { fetchAll, isChallenge, offerPrice, paceMs, PACE_MIN_MS, PACE_MAX_MS };

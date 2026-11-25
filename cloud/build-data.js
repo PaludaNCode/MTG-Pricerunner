@@ -37,6 +37,14 @@ function publishVerdict(results, blocked, maxErrorShare = MAX_ERROR_SHARE) {
   if (results.length && errored / results.length > maxErrorShare) {
     return { ok: false, reason: `${errored} of ${results.length} cards errored (more than ${Math.round(maxErrorShare * 100)}%)` };
   }
+  // Offers with no price at all are not data, they are a parser that no longer matches
+  // the API. On 2026-11-25 CardTrader moved the price into a nested object and every
+  // run stayed green while publishing 179 offers at price: null — the page lost every
+  // CT price and nothing told anyone. Refuse that file and go red instead.
+  const offers = results.flatMap((r) => r.offers || []);
+  if (offers.length && offers.every((o) => o.price == null)) {
+    return { ok: false, reason: `none of ${offers.length} offers carried a price — has the API's price field moved?` };
+  }
   return { ok: true };
 }
 
