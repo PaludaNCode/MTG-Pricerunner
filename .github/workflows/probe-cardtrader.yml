@@ -1,5 +1,5 @@
 # TEMPORARY — diagnostic for the 2026-10-19 CardTrader 403s, and (2026-11-25) for
-# offers arriving without price_cents. Two API requests,
+# offers arriving without price_cents; prints field presence and two redacted offers. Two API requests,
 # nothing published, no branch touched. Run it from Actions -> Run workflow (any
 # branch that carries this file). Delete before merging anything to main.
 name: Probe CardTrader (temporary)
@@ -42,13 +42,33 @@ jobs:
                 "| offers:", Array.isArray(j[292964]) ? j[292964].length : "n/a");
               // 2026-11-25: every offer came back without price_cents. Show the shape of
               // the first offer and every price-ish field, never the seller object.
-              const o = Array.isArray(j[292964]) && j[292964][0];
-              if (o) {
-                console.log("   offer keys:", Object.keys(o).join(", "));
-                for (const [k, v] of Object.entries(o)) {
-                  if (/price|cent|amount|currenc|cost/i.test(k)) console.log(`   ${k}:`, JSON.stringify(v));
+              const list = Array.isArray(j[292964]) ? j[292964] : [];
+              // How many offers carry each field (two levels deep), so we know which
+              // fields are always present and which are left out (e.g. mtg_foil on non-foils).
+              const seen = {};
+              const count = (obj, pre) => {
+                for (const [k, v] of Object.entries(obj || {})) {
+                  const key = pre + k;
+                  seen[key] = (seen[key] || 0) + 1;
+                  if (!pre && v && typeof v === "object" && !Array.isArray(v)) count(v, key + ".");
                 }
-              }
+              };
+              list.forEach((o) => count(o, ""));
+              console.log(`   field presence across ${list.length} offers:`);
+              for (const [k, n] of Object.entries(seen).sort()) console.log(`     ${k}: ${n}`);
+              // One foil and one non-foil specimen. Public log: the seller is reduced to
+              // booleans/numbers, free text replaced, so no names or descriptions leak.
+              const redact = (o) => {
+                const c = JSON.parse(JSON.stringify(o));
+                if (c.user) c.user = Object.fromEntries(Object.entries(c.user).map(([k, v]) =>
+                  [k, typeof v === "string" ? "<redacted>" : v]));
+                if (typeof c.description === "string" && c.description) c.description = "<redacted>";
+                return c;
+              };
+              const foil = list.find((o) => o.properties_hash && o.properties_hash.mtg_foil === true);
+              const plain = list.find((o) => !(o.properties_hash && o.properties_hash.mtg_foil === true));
+              if (foil) console.log("   FOIL SPECIMEN", JSON.stringify(redact(foil)));
+              if (plain) console.log("   NONFOIL SPECIMEN", JSON.stringify(redact(plain)));
             } else {
               console.log("   body:", body.replace(/\s+/g, " ").slice(0, 400));
             }
