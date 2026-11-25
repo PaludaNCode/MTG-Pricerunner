@@ -2,14 +2,14 @@
 // retries it, and if it keeps failing reports it on that card alone.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { fetchAll } = require("../cloud/fetch-cardtrader");
+const { fetchAll, offerPrice } = require("../cloud/fetch-cardtrader");
 
 const product = (id) => ({ site: "cardtrader", group: "Card " + id, name: "Card " + id, blueprintId: id });
 const reset = () => Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }) });
 const ok = (id) => ({
   ok: true,
   status: 200,
-  json: async () => ({ [id]: [{ price_cents: 1234, price_currency: "EUR", quantity: 1, properties_hash: {} }] }),
+  json: async () => ({ [id]: [{ price: { cents: 1234, currency: "EUR" }, quantity: 1, properties_hash: {} }] }),
 });
 const quiet = () => {};
 const FAST = { token: "t", rates: { EUR: 1 }, log: quiet, backoffMs: 0, paceMs: 0 };
@@ -142,4 +142,50 @@ test("the pace between cards is 800–1400 ms, jittered", () => {
   const seen = new Set(Array.from({ length: 200 }, () => paceMs()));
   assert.ok(seen.size > 20, "the jitter actually varies");
   for (const v of seen) assert.ok(v >= PACE_MIN_MS && v <= PACE_MAX_MS);
+});
+
+// 2026-11-25: the API dropped the flat price_cents/price_currency and sends only a nested
+// price object. Reading the flat fields alone published every CT offer at price: null.
+test("reads the nested price object the API sends (cents → euros)", async () => {
+  const { results } = await run([product(5)], async () => ok(5));
+  assert.equal(results[0].offers[0].price, 12.34);
+  assert.equal(results[0].offers[0].priceStr, "12.34 €");
+});
+
+test("offerPrice: nested first, flat fields as a fallback, null when neither is there", () => {
+  assert.deepEqual(offerPrice({ price: { cents: 62, currency: "EUR" } }), { amount: 0.62, currency: "EUR" });
+  assert.deepEqual(offerPrice({ price: { cents: 500, currency: "usd" } }), { amount: 5, currency: "USD" });
+  assert.deepEqual(offerPrice({ price_cents: 1234, price_currency: "EUR" }), { amount: 12.34, currency: "EUR" });
+  assert.deepEqual(offerPrice({ price: { cents: 0, currency: "EUR" } }), { amount: 0, currency: "EUR" });
+  assert.equal(offerPrice({}).amount, null);
+  assert.equal(offerPrice({ price: { currency: "EUR" } }).amount, null);
+});
+
+test("a foreign-currency price is converted to euros", async () => {
+  const write = process.stdout.write;
+  process.stdout.write = () => true;
+  const { results } = await fetchAll([product(6)], {
+    ...FAST,
+    rates: { EUR: 1, USD: 2 },
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ 6: [{ price: { cents: 1000, currency: "USD" }, properties_hash: {} }] }) }),
+  }).finally(() => (process.stdout.write = write));
+  assert.equal(results[0].offers[0].price, 5);
+});
+
+test("an offer without a readable price logs its field names once", async () => {
+  const lines = [];
+  const write = process.stdout.write;
+  process.stdout.write = () => true;
+  try {
+    await fetchAll([product(7), product(8)], {
+      ...FAST,
+      log: (l) => lines.push(l),
+      fetch: async (url) => ({ ok: true, status: 200, json: async () => ({ [url.split("=")[1]]: [{ amount: 1, properties_hash: {} }] }) }),
+    });
+  } finally {
+    process.stdout.write = write;
+  }
+  const hits = lines.filter((l) => l.includes("without a readable price"));
+  assert.equal(hits.length, 1);
+  assert.match(hits[0], /amount, properties_hash/);
 });

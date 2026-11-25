@@ -110,3 +110,17 @@ test("a previous file with no results or meta still carries forward safely", () 
   assert.deepEqual(out.results, []);
   assert.equal(out.meta.cardtrader.strikes, 1);
 });
+
+// 2026-11-25: CardTrader nested the price and every run published 179 offers at
+// price: null, green. A file where no offer has a price is a parser fault, not data.
+const offer = (price) => ({ price, priceStr: price == null ? null : price.toFixed(2) + " €" });
+test("a run whose offers all lack a price is not published", () => {
+  const unpriced = [{ group: "a", offers: [offer(null), offer(null)] }, { group: "b", offers: [offer(null)] }, ...fine(3)];
+  const v = publishVerdict(unpriced, false);
+  assert.equal(v.ok, false);
+  assert.match(v.reason, /none of 3 offers carried a price/);
+});
+
+test("one unpriced offer among priced ones still publishes", () => {
+  assert.equal(publishVerdict([{ group: "a", offers: [offer(1.5), offer(null)] }], false).ok, true);
+});
