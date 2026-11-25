@@ -1,4 +1,5 @@
-# TEMPORARY — diagnostic for the 2026-10-19 CardTrader 403s. Two API requests,
+# TEMPORARY — diagnostic for the 2026-10-19 CardTrader 403s, and (2026-11-25) for
+# offers arriving without price_cents. Two API requests,
 # nothing published, no branch touched. Run it from Actions -> Run workflow (any
 # branch that carries this file). Delete before merging anything to main.
 name: Probe CardTrader (temporary)
@@ -34,9 +35,20 @@ jobs:
             const body = await res.text();
             if (res.ok) {
               // Public log: never print the account payload, only its shape.
-              try { const j = JSON.parse(body); console.log("   ok, keys:", Object.keys(j).join(", "),
-                "| offers:", Array.isArray(j[292964]) ? j[292964].length : "n/a"); }
-              catch { console.log("   ok, non-JSON body of", body.length, "chars"); }
+              let j;
+              try { j = JSON.parse(body); }
+              catch { console.log("   ok, non-JSON body of", body.length, "chars"); return; }
+              console.log("   ok, keys:", Object.keys(j).join(", "),
+                "| offers:", Array.isArray(j[292964]) ? j[292964].length : "n/a");
+              // 2026-11-25: every offer came back without price_cents. Show the shape of
+              // the first offer and every price-ish field, never the seller object.
+              const o = Array.isArray(j[292964]) && j[292964][0];
+              if (o) {
+                console.log("   offer keys:", Object.keys(o).join(", "));
+                for (const [k, v] of Object.entries(o)) {
+                  if (/price|cent|amount|currenc|cost/i.test(k)) console.log(`   ${k}:`, JSON.stringify(v));
+                }
+              }
             } else {
               console.log("   body:", body.replace(/\s+/g, " ").slice(0, 400));
             }
