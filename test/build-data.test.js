@@ -124,3 +124,11 @@ test("a run whose offers all lack a price is not published", () => {
 test("one unpriced offer among priced ones still publishes", () => {
   assert.equal(publishVerdict([{ group: "a", offers: [offer(1.5), offer(null)] }], false).ok, true);
 });
+
+test("a run that names a field missing from every offer is not published", () => {
+  const priced = [{ group: "a", offers: [offer(1.5)] }];
+  assert.equal(publishVerdict(priced, false, MAX_ERROR_SHARE, []).ok, true);
+  const v = publishVerdict(priced, false, MAX_ERROR_SHARE, ["properties_hash.mtg_foil"]);
+  assert.equal(v.ok, false);
+  assert.match(v.reason, /properties_hash\.mtg_foil/);
+});

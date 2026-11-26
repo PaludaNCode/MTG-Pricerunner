@@ -45,6 +45,33 @@ function offerPrice(o) {
   return { amount: cents != null && Number.isFinite(+cents) ? +cents / 100 : null, currency: String(currency).toUpperCase() };
 }
 
+// Every raw field the mapping in fetchCard reads, as a path into an API offer. The probe
+// on 2026-11-25 found all of them on all 220 offers of a card (non-foils send
+// mtg_foil: false rather than leaving it out), so one that is missing from *every*
+// offer in a run means the API changed shape, not that the data happens to be sparse.
+// The check matters most for mtg_foil and can_sell_via_hub: the mapping coerces them
+// with !!, so a renamed field would read as false everywhere instead of as missing.
+// Keep this list in step with the mapping; test/fetch-cardtrader.test.js checks both
+// against the captured specimen in test/fixtures/cardtrader-products.json.
+const REQUIRED_FIELDS = [
+  "price.cents",
+  "price.currency",
+  "quantity",
+  "properties_hash.condition",
+  "properties_hash.mtg_language",
+  "properties_hash.mtg_foil",
+  "user.username",
+  "user.can_sell_via_hub",
+];
+function hasField(o, path) {
+  let v = o;
+  for (const k of path.split(".")) {
+    if (v == null || typeof v !== "object") return false;
+    v = v[k];
+  }
+  return v != null;
+}
+
 const cardUrl = (p) => `https://www.cardtrader.com/en/cards/${p.blueprintId}`;
 
 // A thrown fetch (ECONNRESET, DNS, timeout) used to escape as an unhandled rejection
@@ -121,13 +148,19 @@ async function fetchCard(product, rates, token, opts = {}, diag = {}) {
   }
 
   const list = data[product.blueprintId] || [];
+  // Count every raw offer, before the language filter: more evidence, same fields.
+  for (const o of list) {
+    if (!diag.sample) diag.sample = Object.keys(o || {}).join(", ");
+    diag.offers = (diag.offers || 0) + 1;
+    diag.hits = diag.hits || {};
+    for (const f of REQUIRED_FIELDS) if (hasField(o, f)) diag.hits[f] = (diag.hits[f] || 0) + 1;
+  }
   const offers = [];
   for (const o of list) {
     const ph = o.properties_hash || {};
     const lang = (ph.mtg_language || "").toLowerCase() || null;
     if (product.language && lang !== product.language.toLowerCase()) continue;
     const { amount: rawAmt, currency: rawCur } = offerPrice(o);
-    if (rawAmt == null && !diag.unpriced) diag.unpriced = Object.keys(o).join(", ");
     const eur = rawCur === "EUR" ? rawAmt : toEur(rawAmt, rawCur, rates);
     offers.push({
       price: eur != null ? eur : rawAmt,
@@ -158,11 +191,6 @@ async function fetchAll(products, opts = {}) {
       log(`[ct] first rejected response — ${diag.rejection}`);
       diag.rejection = null;
     }
-    if (diag.unpriced && !diag.unpricedLogged) {
-      // Once per run: the field names are what tells us where the price went.
-      log(`[ct] an offer came back without a readable price — its fields: ${diag.unpriced}`);
-      diag.unpricedLogged = true;
-    }
     results.push(r);
     if (diag.challenged) {
       // Stop here. The remaining cards are reported as errored so the result set stays
@@ -175,7 +203,15 @@ async function fetchAll(products, opts = {}) {
     }
     if (i < products.length - 1) await sleep(opts.paceMs ?? paceMs());
   }
-  return { results, blocked: false };
+  const missingFields = missingFrom(diag);
+  if (missingFields.length) {
+    // Once per run: the offer's actual field names are what tells us where things went.
+    log(`[ct] ${missingFields.join(", ")} missing from all ${diag.offers} offers — an offer's fields: ${diag.sample}`);
+  }
+  return { results, blocked: false, missingFields };
 }
 
-module.exports = { fetchAll, isChallenge, offerPrice, paceMs, PACE_MIN_MS, PACE_MAX_MS };
+// Required fields that no offer in the run carried. Empty when the run saw no offers.
+const missingFrom = (diag) => (diag.offers ? REQUIRED_FIELDS.filter((f) => !(diag.hits && diag.hits[f])) : []);
+
+module.exports = { fetchAll, isChallenge, offerPrice, REQUIRED_FIELDS, paceMs, PACE_MIN_MS, PACE_MAX_MS };

@@ -28,7 +28,7 @@ const OUT = path.join(__dirname, "web", "data.json");
 // Refusing to publish keeps the previous file on the data branch, and the page's own
 // timestamp says how old it is. That is more honest than fresh-looking empty cards.
 const MAX_ERROR_SHARE = 0.25;
-function publishVerdict(results, blocked, maxErrorShare = MAX_ERROR_SHARE) {
+function publishVerdict(results, blocked, maxErrorShare = MAX_ERROR_SHARE, missingFields = []) {
   const errored = results.filter((r) => r.error).length;
   if (blocked) {
     const skipped = results.filter((r) => r.error === "blocked: Cloudflare challenge").length;
@@ -36,6 +36,12 @@ function publishVerdict(results, blocked, maxErrorShare = MAX_ERROR_SHARE) {
   }
   if (results.length && errored / results.length > maxErrorShare) {
     return { ok: false, reason: `${errored} of ${results.length} cards errored (more than ${Math.round(maxErrorShare * 100)}%)` };
+  }
+  // A field the mapping reads that no offer carried is the same fault in a field other
+  // than the price — and for foil and ships-to-me it would not even show as null, since
+  // those are coerced to false. See REQUIRED_FIELDS in fetch-cardtrader.js.
+  if (missingFields.length) {
+    return { ok: false, reason: `no offer carried ${missingFields.join(", ")} — has the CardTrader API changed shape?` };
   }
   // Offers with no price at all are not data, they are a parser that no longer matches
   // the API. On 2026-11-25 CardTrader moved the price into a nested object and every
@@ -129,7 +135,7 @@ async function main() {
   }
   if (open) console.log(`[ct] probe_now: ignoring the open breaker (until ${open.until})`);
 
-  const { results, blocked } = await cardtrader.fetchAll(products, { token: TOKEN });
+  const { results, blocked, missingFields } = await cardtrader.fetchAll(products, { token: TOKEN });
 
   if (blocked) {
     const state = tripBreaker(prev, now);
@@ -146,7 +152,7 @@ async function main() {
     return;
   }
 
-  const verdict = publishVerdict(results, false);
+  const verdict = publishVerdict(results, false, MAX_ERROR_SHARE, missingFields);
   if (!verdict.ok) {
     console.error(`${verdict.reason} — not writing data.json so the last good data survives`);
     process.exit(1);
